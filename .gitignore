@@ -1,0 +1,13 @@
+/initplanimages
+/planimages
+/pytorch_models
+*.h5
+*.pyc
+*.png
+*.pth
+*.jpg
+/archive
+/runs
+/replay_buffer
+/replay_buffer2
+/.venv
