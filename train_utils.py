@@ -2,12 +2,10 @@ import time
 import numpy as np
 import torch
 from TrainingObject import *
-from utils import get_image,check_done,merge_images,clear_folder,action_directions_one_hot_vector,normalize_data,save_image,check_done_reward,correct_done_drqv2
+from utils import check_done
 import torch.nn.functional as F
 from utils import load_model
-import torchvision.transforms.functional as TF
 import random
-import gym
 from env_ursina import*
 
 

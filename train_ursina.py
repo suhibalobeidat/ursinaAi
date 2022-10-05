@@ -9,7 +9,7 @@ import random
 from Teacher import get_teacher
 from vec_normalize_parallel import NormalizedEnv
 from train_utils import ppo_update,get_epoch_trajectories_ursina,test_ursina,to_torch_tensor
-from utils import images_args,clear_folder,load_model,get_data_statistics,save_model,create_data_stat,get_data_statistics_gym
+from utils import images_args,load_model,get_data_statistics,save_model,create_data_stat
 from torch.utils.tensorboard import SummaryWriter
 from models import ActorCritic
 import torch.backends.cudnn
@@ -37,8 +37,8 @@ parser.add_argument('--max_iter', type=int, default=3000000, help='max number of
 parser.add_argument('--load_model', type=bool, default=False, help='load a pretrained model')
 parser.add_argument('--compute_dynamic_stat', type=bool, default=True, help='collect the agents data in parallel')
 parser.add_argument('--anneal_lr', type=bool, default= False, help='collect the agents data in parallel')
-parser.add_argument('--parallel_workers_test', type=int, default=6, help='number of parallel agents')
-parser.add_argument('--parallel_workers', type=int, default=6, help='number of parallel agents')
+parser.add_argument('--parallel_workers_test', type=int, default=1, help='number of parallel agents')
+parser.add_argument('--parallel_workers', type=int, default=1, help='number of parallel agents')
 
 
 
