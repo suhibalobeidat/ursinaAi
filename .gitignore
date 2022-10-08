@@ -11,3 +11,4 @@
 /replay_buffer
 /replay_buffer2
 /.venv
+/.gitignore
