@@ -37,8 +37,8 @@ parser.add_argument('--max_iter', type=int, default=3000000, help='max number of
 parser.add_argument('--load_model', type=bool, default=False, help='load a pretrained model')
 parser.add_argument('--compute_dynamic_stat', type=bool, default=True, help='collect the agents data in parallel')
 parser.add_argument('--anneal_lr', type=bool, default= False, help='collect the agents data in parallel')
-parser.add_argument('--parallel_workers_test', type=int, default=1, help='number of parallel agents')
-parser.add_argument('--parallel_workers', type=int, default=1, help='number of parallel agents')
+parser.add_argument('--parallel_workers_test', type=int, default=10, help='number of parallel agents')
+parser.add_argument('--parallel_workers', type=int, default=10, help='number of parallel agents')
 
 
 

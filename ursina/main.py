@@ -52,10 +52,10 @@ class Ursina(ShowBase):
         camera.set_up()
 
         # input
-        base.buttonThrowers[0].node().setButtonDownEvent('buttonDown')
+        """ base.buttonThrowers[0].node().setButtonDownEvent('buttonDown')
         base.buttonThrowers[0].node().setButtonUpEvent('buttonUp')
         base.buttonThrowers[0].node().setButtonRepeatEvent('buttonHold')
-        base.buttonThrowers[0].node().setKeystrokeEvent('keystroke')  
+        base.buttonThrowers[0].node().setKeystrokeEvent('keystroke')  """ 
         self._input_name_changes = {
             'mouse1' : 'left mouse down',
             'mouse1 up' : 'left mouse up',
@@ -133,7 +133,7 @@ class Ursina(ShowBase):
         # time between frames
         time.dt = globalClock.getDt() * application.time_scale
 
-        mouse.update()
+        #mouse.update()
 
         if hasattr(__main__, 'update') and __main__.update and not application.paused:
             __main__.update()

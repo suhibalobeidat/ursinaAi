@@ -23,7 +23,7 @@ class Window(WindowProperties):
         # loadPrcFileData('', 'textures-power-2 none')
         # loadPrcFileData('', 'threading-model Cull/Draw')
         loadPrcFileData('', 'coordinate-system y-up-left')
-        #loadPrcFileData('', 'window-type offscreen')
+        loadPrcFileData('', 'window-type offscreen')
 
         # fallback to one of these if opengl is not supported
         loadPrcFileData('', 'aux-display pandadx9')
