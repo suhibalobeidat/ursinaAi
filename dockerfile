@@ -1,12 +1,18 @@
-ARG REGION=us-east-1
+ARG AWS_REGION
+ARG CPU_OR_GPU
 
 # Load the SageMaker PyTorch image
-FROM 520713654638.dkr.ecr.$REGION.amazonaws.com/sagemaker-pytorch:1.10-gpu-py3
+FROM 763104351884.dkr.ecr.${AWS_REGION}.amazonaws.com/pytorch-training:1.12.1-${CPU_OR_GPU}-py38-ubuntu20.04-ec2
 
 # Update Python with the required packages
 RUN pip install --upgrade pip
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install sklearn
+RUN pip install opencv-python
+RUN pip install h5py
+RUN pip install panda3d
+RUN pip install pyperclip
+RUN pip install tensorboard
+RUN pip install einops
 
 # /opt/ml and all subdirectories are utilized by SageMaker, we use the /code subdirectory to store our user code.
 ENV PATH="/opt/ml/code:${PATH}"

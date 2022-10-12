@@ -37,15 +37,16 @@ parser.add_argument('--max_iter', type=int, default=3000000, help='max number of
 parser.add_argument('--load_model', type=bool, default=False, help='load a pretrained model')
 parser.add_argument('--compute_dynamic_stat', type=bool, default=True, help='collect the agents data in parallel')
 parser.add_argument('--anneal_lr', type=bool, default= False, help='collect the agents data in parallel')
-parser.add_argument('--parallel_workers_test', type=int, default=10, help='number of parallel agents')
-parser.add_argument('--parallel_workers', type=int, default=10, help='number of parallel agents')
+parser.add_argument('--parallel_workers_test', type=int, default=1, help='number of parallel agents')
+parser.add_argument('--parallel_workers', type=int, default=1, help='number of parallel agents')
+parser.add_argument('--sageMaker', type=bool, default=True, help='number of parallel agents')
 
 
 
 
 
 
-def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_args,args,device,ppo_trained_file_name,data_stat):
+def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_args,args,device,ppo_trained_file_name,data_stat,model_dir):
    
     update_lr = lambda f: f * args.lr
     num_updates = 1000000 // args.num_steps
@@ -109,7 +110,7 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         writer.add_scalar('successful_ep',counter.iter_successful_ep/(len(traj["text_inputs"])),iter_idx)
         
         if normalizedEnv.ob_rms:
-            create_data_stat(normalizedEnv.ob_rms.mean, np.sqrt(normalizedEnv.ob_rms.var))
+            create_data_stat(model_dir,normalizedEnv.ob_rms.mean, np.sqrt(normalizedEnv.ob_rms.var))
 
         text_input = to_torch_tensor(traj["text_inputs"])
         actions_length = to_torch_tensor(traj["actions_length"])
@@ -163,7 +164,7 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         counter.total_time +=total_epoch_time
         writer.add_scalar('Total time in h',counter.total_time/3600,iter_idx)
         
-        save_model(model = model.state_dict(),filename = "%s" % (ppo_trained_file_name), directory="./trained_models")
+        save_model(model = model.state_dict(),filename = "%s" % (ppo_trained_file_name), directory=model_dir)
 
 
 if __name__ == '__main__':
@@ -187,6 +188,14 @@ if __name__ == '__main__':
     file_name = "%s_%s_%s" % ("model", "pipeit_navigation", str(args.seed))
     ppo_trained_file_name = "%s_%s_%s" % ("model", "pipeit_navigation", str(args.seed))
 
+    if args.sageMaker:
+        model_dir = os.environ['SM_MODEL_DIR']
+        tensorBoard_dir = '/opt/ml/output/tensorboard/'
+        writer = SummaryWriter(tensorBoard_dir)
+    else:
+        model_dir = "./trained_models"
+        writer = SummaryWriter()
+
     model = ActorCritic(args.text_input_length,args.depth_map_length,args.action_direction_length).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -208,10 +217,9 @@ if __name__ == '__main__':
 
     env = parallel_envs(args.parallel_workers,args.text_input_length,args.action_direction_length)
 
-    writer = SummaryWriter()
 
     teacher = get_teacher()
 
     counter = Counter()
 
-    train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_args,args,device,ppo_trained_file_name,None)
+    train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_args,args,device,ppo_trained_file_name,None,model_dir)
