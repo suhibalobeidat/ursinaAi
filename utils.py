@@ -54,8 +54,8 @@ def load_model(_model,filename, directory):
     _model.load_state_dict(torch.load('%s/%s.pth' % (directory, filename)))
 
 
-def create_data_stat(texts_mean,texts_std):
-    file = h5py.File("data_stat.h5", "w")
+def create_data_stat(dir,texts_mean,texts_std):
+    file = h5py.File(dir + "/data_stat.h5", "w")
 
     file.create_dataset(
             "texts_mean", np.shape(texts_mean), data=texts_mean
