@@ -1,5 +1,3 @@
-from operator import indexOf
-from tokenize import Ignore
 from enums import *
 from ursina import *
 from opening import Opening

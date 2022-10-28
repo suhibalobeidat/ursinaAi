@@ -55,7 +55,7 @@ class Ursina(ShowBase):
         """ base.buttonThrowers[0].node().setButtonDownEvent('buttonDown')
         base.buttonThrowers[0].node().setButtonUpEvent('buttonUp')
         base.buttonThrowers[0].node().setButtonRepeatEvent('buttonHold')
-        base.buttonThrowers[0].node().setKeystrokeEvent('keystroke')  """ 
+        base.buttonThrowers[0].node().setKeystrokeEvent('keystroke')  """
         self._input_name_changes = {
             'mouse1' : 'left mouse down',
             'mouse1 up' : 'left mouse up',

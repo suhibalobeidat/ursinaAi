@@ -16,6 +16,7 @@ import torch.backends.cudnn
 from counter import Counter
 from env_ursina import parallel_envs
 import warnings
+from gpu_usage import print_gpu_memory_every_5secs
 
 warnings.filterwarnings('ignore')
 
@@ -24,13 +25,13 @@ parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
 parser.add_argument('--max_grad_norm', type=float, default=0.5, help='Learning rate for discriminator')
 parser.add_argument('--critic_loss_coeff', type=float, default=0.5, help='Learning rate for discriminator')
 parser.add_argument('--entropy_coeff', type=float, default=0.01, help='Learning rate for discriminator')
-parser.add_argument('--bs', type=int, default=1024, help='Batch size')
-parser.add_argument('--ppo_epochs', type=int, default=5, help='Number of epochs')
+parser.add_argument('--bs', type=int, default=10, help='Batch size')
+parser.add_argument('--ppo_epochs', type=int, default=2, help='Number of epochs')
 parser.add_argument('--text_input_length', type=int, default=413, help='406 Number of features in text input')
 parser.add_argument('--depth_map_length', type=int, default=361, help='361 Number of features in text input')
 parser.add_argument('--action_direction_length', type=int, default=29, help='possible actions')
 parser.add_argument('--max_action_length', type=int, default=10, help='the max action length')
-parser.add_argument('--num_steps', type=int, default=2050, help='number of steps per epoch')
+parser.add_argument('--num_steps', type=int, default=50, help='number of steps per epoch')
 parser.add_argument('--test_steps', type=int, default=10000, help='number of steps per epoch')
 parser.add_argument('--seed', type=int, default=7, help='seed to initialize libraries')
 parser.add_argument('--max_iter', type=int, default=3000000, help='max number of steps')
@@ -39,7 +40,7 @@ parser.add_argument('--compute_dynamic_stat', type=bool, default=True, help='col
 parser.add_argument('--anneal_lr', type=bool, default= False, help='collect the agents data in parallel')
 parser.add_argument('--parallel_workers_test', type=int, default=1, help='number of parallel agents')
 parser.add_argument('--parallel_workers', type=int, default=1, help='number of parallel agents')
-parser.add_argument('--sageMaker', type=bool, default=True, help='number of parallel agents')
+parser.add_argument('--sageMaker', type=bool, default=False, help='number of parallel agents')
 
 
 
@@ -166,13 +167,13 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         
         save_model(model = model.state_dict(),filename = "%s" % (ppo_trained_file_name), directory=model_dir)
 
-
 if __name__ == '__main__':
     args = parser.parse_args()
     image_args = images_args()
 
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
+    print_gpu_memory_every_5secs()
 
     torch.random.manual_seed(args.seed)
     torch.manual_seed(args.seed)
@@ -183,6 +184,9 @@ if __name__ == '__main__':
     random.seed(args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print("*****device*****", device)
+    
 
 
     file_name = "%s_%s_%s" % ("model", "pipeit_navigation", str(args.seed))

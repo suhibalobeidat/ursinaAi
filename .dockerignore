@@ -1,8 +1,9 @@
-/pytorch_models
 *.h5
 *.pyc
-*.pth
 /archive
 /runs
 /.venv
 /.gitignore
+/__pycache__
+data_stat.h5
+requirements.txt

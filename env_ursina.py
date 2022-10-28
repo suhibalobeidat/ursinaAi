@@ -1,5 +1,3 @@
-from dis import dis
-from operator import length_hint
 import threading
 from enums import ConnectorShape, Commands
 from room_layout import Layout

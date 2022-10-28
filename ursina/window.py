@@ -8,7 +8,6 @@ from ursina import color, application
 from ursina.scene import instance as scene    # for toggling collider visibility
 from ursina.string_utilities import print_info, print_warning
 
-
 class Window(WindowProperties):
 
     def __init__(self):
@@ -58,8 +57,9 @@ class Window(WindowProperties):
         except:
             from screeninfo import get_monitors
             self.screen_resolution = [get_monitors()[0].width, get_monitors()[0].height]
-
-        self.fullscreen_size = Vec2(*self.screen_resolution)
+            
+        #self.screen_resolution = (200,200)
+        self.fullscreen_size = Vec2(*self.screen_resolution)#Vec2(*self.screen_resolution) 
         self.windowed_size = self.fullscreen_size / 1.25
         self.windowed_position = None   # gets set when entering fullscreen so position will be correct when going back to windowed mode
         self.forced_aspect_ratio = None # example: window.forced_aspect_ratio = 16/9
@@ -69,7 +69,6 @@ class Window(WindowProperties):
         self.top = Vec2(0, .5)
         self.bottom = Vec2(0, -.5)
         self.center = Vec2(0, 0)
-
 
 
     def late_init(self):

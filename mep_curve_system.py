@@ -1,13 +1,9 @@
-from ast import Pass
-from telnetlib import X3PAD
 from ursina import *
 from utils_ursina import *
 from mep_curve_segmant import *
 from enums import *
 import numpy as np
 from transform import Transform
-from panda3d.core import LMatrix4f as matrix
-import threading
 
 class System():
     def __init__(self,shape,max_iteration,detection_distance = 30,max_distance_to_goal = 5,radius_mul = 1.5):

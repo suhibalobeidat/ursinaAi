@@ -1,5 +1,3 @@
-
-from tkinter import Y
 from ursina import *
 from enums import MovmentDirection, RotationAxis
 from utils_ursina import *
