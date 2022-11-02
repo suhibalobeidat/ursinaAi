@@ -196,7 +196,7 @@ class Camera(Entity):
         self.filter_quad.setShaderInput(name, value)
 
 
-instance = Camera()
+#instance = Camera()
 
 
 if __name__ == '__main__':

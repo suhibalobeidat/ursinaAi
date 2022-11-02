@@ -319,7 +319,7 @@ class Mouse():
 
 
 
-instance = Mouse()
+#instance = Mouse()
 
 
 if __name__ == '__main__':

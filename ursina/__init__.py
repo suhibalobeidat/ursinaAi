@@ -7,9 +7,9 @@ import random
 from copy import copy, deepcopy
 from math import floor, ceil, inf
 
-from ursina.window import instance as window
+""" from ursina.window import instance as window
 from ursina.camera import instance as camera
-from ursina.mouse import instance as mouse
+from ursina.mouse import instance as mouse """
 from ursina.main import Ursina
 from ursina.ursinamath import *
 from ursina.ursinastuff import *
@@ -39,14 +39,14 @@ from ursina.text import Text
 from ursina.mesh import Mesh, MeshModes
 
 from ursina.prefabs.sprite import Sprite
-from ursina.prefabs.button import Button
-from ursina.prefabs.panel import Panel
-from ursina.prefabs.sprite_sheet_animation import SpriteSheetAnimation
+#from ursina.prefabs.button import Button
+#from ursina.prefabs.panel import Panel
+""" from ursina.prefabs.sprite_sheet_animation import SpriteSheetAnimation
 from ursina.prefabs.animation import Animation
 from ursina.prefabs.frame_animation_3d import FrameAnimation3d
 from ursina.prefabs.animator import Animator
 from ursina.prefabs.sky import Sky
-from ursina.prefabs.cursor import Cursor
+from ursina.prefabs.cursor import Cursor """
 
 from ursina.models.procedural.quad import Quad
 from ursina.models.procedural.plane import Plane
@@ -54,27 +54,27 @@ from ursina.models.procedural.circle import Circle
 from ursina.models.procedural.pipe import Pipe
 from ursina.models.procedural.cone import Cone
 from ursina.models.procedural.cube import Cube
-from ursina.models.procedural.cylinder import Cylinder
+""" from ursina.models.procedural.cylinder import Cylinder
 from ursina.models.procedural.capsule import Capsule
 from ursina.models.procedural.grid import Grid
-from ursina.models.procedural.terrain import Terrain
+from ursina.models.procedural.terrain import Terrain """
 
-from ursina.scripts.terraincast import terraincast
+""" from ursina.scripts.terraincast import terraincast
 from ursina.scripts.smooth_follow import SmoothFollow
 # from ursina.scripts.position_limiter import PositionLimiter
 # from ursina.scripts.noclip_mode import NoclipMode, NoclipMode2d
 from ursina.scripts.grid_layout import grid_layout
 from ursina.scripts.scrollable import Scrollable
 # from ursina.scripts.colorize import get_world_normals
-
-from ursina.prefabs.tooltip import Tooltip
+ """
+""" from ursina.prefabs.tooltip import Tooltip
 from ursina.prefabs.text_field import TextField
 from ursina.prefabs.input_field import InputField, ContentTypes
 from ursina.prefabs.draggable import Draggable
 from ursina.prefabs.slider import Slider, ThinSlider
 from ursina.prefabs.button_group import ButtonGroup
 from ursina.prefabs.window_panel import WindowPanel, Space
-from ursina.prefabs.button_list import ButtonList
+from ursina.prefabs.button_list import ButtonList """
 # from ursina.prefabs.file_browser import FileBrowser
 # from ursina.prefabs import primitives
 

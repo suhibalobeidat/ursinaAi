@@ -12,7 +12,7 @@ from ursina import *
 
 def create_env(receive_queue,send_queue):
     app = Ursina()
-    EditorCamera()
+    #EditorCamera()
     navigation_env = Navigation_env(receive_queue,send_queue)
     app.set_env(navigation_env)
     app.run()
@@ -222,6 +222,120 @@ class parallel_envs():
 
         for thread in threads:
             thread.start()
+
+    def reset_thread(self,i,goal):
+        receivedData = self.envs[i].reset(goal)
+
+        new_obs = receivedData[:len(receivedData)-self.mask_size]
+        new_mask = receivedData[len(receivedData)-self.mask_size:]
+
+        self.new_obs[i] = new_obs
+        self.mask[i] = new_mask
+
+    def step_thread(self,i,action):
+        receivedData = self.envs[i].step(action)
+
+        new_obs = receivedData[:len(receivedData)-(self.mask_size+2)]
+        new_mask = receivedData[len(receivedData)-(self.mask_size+2):len(receivedData)-2]
+        done = receivedData[len(receivedData)-2]
+        reward = receivedData[len(receivedData)-1]
+
+        self.new_obs[i] = new_obs
+        self.mask[i] = new_mask
+        self.reward[i] = reward
+        self.done[i] = done
+
+    def clear_thread(self,i):
+        receivedData = self.envs[i].clear()
+
+    def get_dummy_init_state(self,active_workers):
+        obs = np.zeros(shape=(active_workers,self.obs_size))
+        mask = np.zeros(shape=(active_workers,self.mask_size))
+
+        return obs, mask
+
+
+    def reset(self,goal,obs, mask, done):
+
+        self.new_obs = obs
+        self.mask = mask
+
+        threads = []
+
+        for i in range(self.active_workers):
+            if self.envs[i].is_done():
+                thread = threading.Thread(target=self.reset_thread, args=(i,goal[i].tolist()))
+                threads.append(thread)
+                thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        return self.new_obs,self.mask  
+
+    def step(self,action,done,reward,obs):
+
+        self.new_obs = obs
+        self.mask = np.zeros(shape=(self.active_workers,self.mask_size))
+        self.done = done
+        self.reward = deepcopy(reward)
+
+        threads = []
+
+        for i in range(self.active_workers):
+            if not self.envs[i].is_done():
+                thread = threading.Thread(target=self.step_thread, args=(i,action[i]))
+                thread.start()
+                threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        #print("reward inside env", self.reward)
+
+        return self.new_obs,self.mask,self.reward,self.done
+
+    def get_random_action(self):
+        actions = np.zeros(shape=(len(self.envs),2))
+
+        for i in range(len(self.envs)):
+            action = self.envs[i].get_random_action()
+            actions[i] = action
+
+        return actions
+
+    def clear(self):
+        threads = []
+
+        for i in range(self.active_workers):
+            thread = threading.Thread(target=self.clear_thread, args=(i,))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+    def terminate(self):
+        for env in self.envs:
+            env.process.terminate()
+
+class mul_parallel_envs():
+    def __init__(self,envs,parallel_envs_count, obs_size, mask_size):
+        self.parallel_envs_count = parallel_envs_count
+        self.envs = []
+        self.mask_size = mask_size
+        self.obs_size = obs_size
+        self.init(envs)
+        self.dummy_obs,self.dummy_mask = self.get_dummy_init_state(parallel_envs_count)
+        self.active_workers = parallel_envs_count
+
+    def set_active_workers(self,active_workers):
+        self.active_workers = active_workers
+        self.dummy_obs,self.dummy_mask = self.get_dummy_init_state(active_workers)
+
+    def init(self,envs):
+        for i in range(len(envs)):
+            self.envs.extend(envs[i].envs)
 
     def reset_thread(self,i,goal):
         receivedData = self.envs[i].reset(goal)

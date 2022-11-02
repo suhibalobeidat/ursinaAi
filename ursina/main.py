@@ -10,10 +10,10 @@ from ursina import application
 from ursina import input_handler
 from ursina.window import instance as window
 from ursina.scene import instance as scene
-from ursina.camera import instance as camera
-from ursina.mouse import instance as mouse
+#from ursina.camera import instance as camera
+#from ursina.mouse import instance as mouse
 from ursina.string_utilities import print_info
-
+from panda3d.core import loadPrcFileData
 
 import __main__
 time.dt = 0
@@ -29,8 +29,34 @@ class Ursina(ShowBase):
         if 'development_mode' in kwargs:
             application.development_mode = kwargs['development_mode']
 
+        loadPrcFileData('', 'window-title ursina')
+        loadPrcFileData('', 'textures-auto-power-2 #t')
+        loadPrcFileData('', 'load-file-type p3assimp')
+        # loadPrcFileData('', 'allow-portal-cull #t')
+        # loadPrcFileData("", "framebuffer-multisample 1")
+        # loadPrcFileData('', 'multisamples 2')
+        # loadPrcFileData('', 'textures-power-2 none')
+        #loadPrcFileData('', 'threading-model Cull')
+        loadPrcFileData('', 'coordinate-system y-up-left')
+        loadPrcFileData('', 'window-type none')
+
+        # fallback to one of these if opengl is not supported
+        loadPrcFileData("", "load-display pandaegl")
+
+        loadPrcFileData('', 'aux-display pandaegl')
+        loadPrcFileData('', 'aux-display pandagles2')
+
+        #loadPrcFileData('', 'gl-finish 1')   
+
+        loadPrcFileData('', 'notify-level-util warning')   
+        loadPrcFileData("", "notify-level warning")
+        loadPrcFileData("", "notify-level-egldisplay spam")
+        loadPrcFileData("", "gl-debug true")
+        loadPrcFileData("", "audio-library-name null") # Prevent ALSA errors
+
         super().__init__()
         application.base = base
+
         self.navigation_env = None
         try:
             import gltf
@@ -38,18 +64,18 @@ class Ursina(ShowBase):
         except:
             pass
 
-        window.late_init()
+        """ window.late_init()
         for name in ('title', 'fullscreen', 'position', 'show_ursina_splash', 'borderless', 'render_mode'):
             if name in kwargs and hasattr(window, name):
-                setattr(window, name, kwargs[name])
+                setattr(window, name, kwargs[name]) """
 
         # camera
-        camera._cam = base.camera
+        """ camera._cam = base.camera
         camera._cam.reparent_to(camera)
         camera.render = base.render
         camera.position = (0, 0, -20)
         scene.camera = camera
-        camera.set_up()
+        camera.set_up() """
 
         # input
         """ base.buttonThrowers[0].node().setButtonDownEvent('buttonDown')
@@ -106,9 +132,9 @@ class Ursina(ShowBase):
         ConfigVariableBool('paste-emit-keystrokes', False)
 
         base.disableMouse()
-        mouse._mouse_watcher = base.mouseWatcherNode
+        """ mouse._mouse_watcher = base.mouseWatcherNode
         mouse.enabled = True
-        self.mouse = mouse
+        self.mouse = mouse """
 
         from ursina import gamepad
 
@@ -118,13 +144,13 @@ class Ursina(ShowBase):
         # try to load settings that need to be applied before entity creation
         application.load_settings()
 
-        from ursina.prefabs.hot_reloader import HotReloader
+        """ from ursina.prefabs.hot_reloader import HotReloader
         # make sure it's running from a file and not an interactive session.
-        application.hot_reloader = HotReloader(__main__.__file__ if hasattr(__main__, '__file__') else 'None')
+        application.hot_reloader = HotReloader(__main__.__file__ if hasattr(__main__, '__file__') else 'None') """
 
-        window.make_editor_gui()
+        """ window.make_editor_gui()
         if 'editor_ui_enabled' in kwargs:
-            window.editor_ui.enabled = kwargs['editor_ui_enabled']
+            window.editor_ui.enabled = kwargs['editor_ui_enabled'] """
 
     def set_env(self,env):
         self.navigation_env = env
@@ -218,8 +244,8 @@ class Ursina(ShowBase):
                         script.input(key)
 
 
-        try: mouse.input(key)
-        except: pass
+        """ try: mouse.input(key)
+        except: pass """
 
 
         if key == 'f12':
@@ -273,12 +299,12 @@ class Ursina(ShowBase):
 
 
     def run(self, info=True):
-        if window.show_ursina_splash:
-            from ursina.prefabs import ursina_splash
+        """ if window.show_ursina_splash:
+            from ursina.prefabs import ursina_splash """
 
         application.load_settings()
         if info:
-            print('screen resolution:', window.screen_resolution)
+            #print('screen resolution:', window.screen_resolution)
             print('os:', platform.system())
             print('development mode:', application.development_mode)
             print('application successfully started')

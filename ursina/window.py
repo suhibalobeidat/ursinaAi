@@ -364,7 +364,7 @@ class Window(WindowProperties):
             object.__setattr__(self, name, value)
 
 
-instance = Window()
+instance = None#Window()
 
 
 if __name__ == '__main__':

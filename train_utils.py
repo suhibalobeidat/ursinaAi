@@ -3,234 +3,245 @@ import numpy as np
 import torch
 from TrainingObject import *
 from utils import check_done
-import torch.nn.functional as F
 from utils import load_model
 import random
 from env_ursina import*
+from models import ActorCritic
 
 
 @torch.no_grad()
-def get_epoch_trajectories_ursina(model,env,teacher,normalizedEnv,counter,writer,device,args,image_args):
-    
-    done_true = np.full((args.parallel_workers, 1), 1)
-    done = np.full((args.parallel_workers, 1), 0)
-    reward = np.zeros(shape=(args.parallel_workers,1))
+def get_epoch_trajectories_ursina(model,env,teacher,normalizedEnv,counter,writer,device,args,q_model,q_traj):
 
-    num_episodes = 0
-
-    env_params = []
-          
-    env.set_active_workers(args.parallel_workers)
-
-    values_episode = TrainingObject_parallel(args.parallel_workers)
-    terminals_episode = TrainingObject_parallel(args.parallel_workers)
-    texts_inputs_episode = TrainingObject_parallel(args.parallel_workers)
-    actions_masks_episode = TrainingObject_parallel(args.parallel_workers)
-    actions_length_episode = TrainingObject_parallel(args.parallel_workers)
-    actions_directions_episode = TrainingObject_parallel(args.parallel_workers)
-    actions_length_log_probs_episode = TrainingObject_parallel(args.parallel_workers)
-    actions_directions_log_probs_episode = TrainingObject_parallel(args.parallel_workers)
-    rewards_episode = TrainingObject_parallel(args.parallel_workers)
-    hidden_states_episode = TrainingObject_parallel(args.parallel_workers, False)
-    cell_states_episode = TrainingObject_parallel(args.parallel_workers,False)
-
-    total_actions_length_log_probs = []
-    total_actions_directions_log_probs = []
-    total_values = []  
-    total_texts_inputs = []
-    total_actions_length = []
-    total_actions_directions = []
-    total_terminals = []   
-    total_action_masks = []
-    total_next_values = []
-    total_rewards   = []
-    total_returns = []
-    total_advantages = []
-    total_hidden_states = []
-    total_cell_states = []
-
-    for i in range(args.parallel_workers):
-        params = teacher.get_env_params()
-        env_params.append(params)
-
-    
-
-    text_input,mask = env.reset(env_params,env.dummy_obs,env.dummy_mask, done_true) 
-    text_input,mask = normalizedEnv.reset(text_input,mask,done_true)
-
-    model.get_init_state(args.parallel_workers,device)
-    
-    while counter.iter_epoch < args.num_steps or 0 in done:#done.sum() != args.parallel_workers:
-        start = time.time()
-
-        #inference_start_time = time.time()
-
-        hidden_state = model.hidden_cell[0]
-        cell_state = model.hidden_cell[1]
-
-        writer.add_histogram('text,',text_input,counter.iter_index)
-
-        text_input = torch.FloatTensor(text_input).to(device)
-        mask = torch.BoolTensor(mask).to(device)
-
-       
-        if normalizedEnv.ob_rms:
-            writer.add_histogram('text_mean,',normalizedEnv.ob_rms.mean,counter.iter_index)
-            writer.add_histogram('text_std,',np.sqrt(normalizedEnv.ob_rms.var),counter.iter_index)
-
-
-        action_length_dist,action_direction_dist,value = model(text_input,mask)
-
-        action_direction = action_direction_dist.sample().reshape(-1,1)
-        action_length = action_length_dist.sample().expand_as(action_direction)
-
-        action = np.concatenate((action_length.cpu().numpy()*10,action_direction.cpu().numpy()), axis=-1)
-
-        next_text_input, next_mask,reward,done = env.step(action,done,reward,text_input.cpu().numpy())
+    if model == None:
+        model = ActorCritic(args.text_input_length,args.depth_map_length,args.action_direction_length).to(device)
         
-        #print(done)
+    while True:
 
-        done_bool,successful_ep = check_done(done)
+        model_dic = q_model.get()
 
-        #inference_end_time = time.time()
-        #writer.add_scalar('time for inference in ms',(inference_end_time - inference_start_time)*1000,counter.iter_index)
+        model.load_state_dict(model_dic)
 
+        done_true = np.full((args.envs_per_worker, 1), 1)
+        done = np.full((args.envs_per_worker, 1), 0)
+        reward = np.zeros(shape=(args.envs_per_worker,1))
 
-        #reward_start_time = time.time()
+        num_episodes = 0
 
-        #print("reward without normalization", reward)
-        writer.add_histogram('env rewards without normalization,',reward,counter.iter_index)
-        next_text_input,normalized_reward = normalizedEnv.step(next_text_input,reward,done)
-        #print("reward with normalization", normalized_reward)
-
-        writer.add_histogram('env rewards with normalization,',normalized_reward,counter.iter_index)
-
-        #reward_end_time = time.time()
-
-        #print(f'time for reward adding:{(reward_end_time - reward_start_time)*1000}') 
-        #writer.add_scalar('time for reward adding in ms',(reward_end_time - reward_start_time)*1000,counter.iter_index)
-
-        #storing_data_start_time = time.time()
-        action_log_prob = action_length_dist.log_prob(action_length)            
-        axis_log_prob = action_direction_dist.log_prob(action_direction.flatten()).reshape(-1,1)
-
-
-        actions_length_log_probs_episode.append(action_log_prob.cpu(),done)
-        actions_directions_log_probs_episode.append(axis_log_prob.cpu(),done)
-        values_episode.append(value.cpu(),done)
-        terminals_episode.append(torch.FloatTensor(1 - done_bool).cpu(),done)        
-        texts_inputs_episode.append(text_input.cpu(),done)
-        actions_masks_episode.append(mask.cpu(),done)
-        actions_length_episode.append(action_length.cpu(),done)
-        actions_directions_episode.append(action_direction.cpu(),done)
-        rewards_episode.append(torch.FloatTensor(normalized_reward).cpu(),done)
-        hidden_states_episode.append(hidden_state.cpu(),done)
-        cell_states_episode.append(cell_state.cpu(),done)
-  
-        text_input = next_text_input
-        mask = next_mask
-
-        counter.iter_index += args.parallel_workers - np.count_nonzero(done == -1)
-        counter.iter_epoch += args.parallel_workers - np.count_nonzero(done == -1)
-        counter.iter_test += args.parallel_workers - np.count_nonzero(done == -1)
-
-        #storing_data_end_time = time.time()
-        #writer.add_scalar('time for storing data in ms',(storing_data_end_time - storing_data_start_time)*1000,counter.iter_index)
-
-        if 1 in done:
-            #inside_start_time = time.time()
-
-            num_episodes += np.count_nonzero(done == 1)
-
-            if successful_ep.sum() > 0:
-                counter.iter_successful_ep += successful_ep.sum()
-
-            print(f"number of completed episodes: {num_episodes}")
-
-            next_text_input = torch.FloatTensor(text_input).to(device)
-            next_mask = torch.BoolTensor(mask).to(device)
-  
-
-            _,_,next_value = model(next_text_input,next_mask)             
-                
-            next_value = values_episode.get_next_value(next_value.cpu(),done)
-            valus = values_episode.get_completed(done)
-            termnls = terminals_episode.get_completed(done)
-            rewards = rewards_episode.get_completed(done)
-
-            retrn,advantage = values_episode.compute_gae(next_value, rewards, termnls, valus)
-
-
+        env_params = []
             
+        #env.set_active_workers(args.parallel_workers)
 
-            total_terminals +=termnls
-            total_values +=valus
-            total_next_values += next_value
-            total_rewards += rewards
-            total_returns += retrn
-            total_advantages+=advantage
-            total_texts_inputs += texts_inputs_episode.get_completed(done)
-            total_actions_length += actions_length_episode.get_completed(done)
-            total_actions_directions += actions_directions_episode.get_completed(done)
-            total_action_masks +=actions_masks_episode.get_completed(done)            
-            total_actions_length_log_probs +=actions_length_log_probs_episode.get_completed(done)
-            total_actions_directions_log_probs += actions_directions_log_probs_episode.get_completed(done)
-            total_hidden_states += hidden_states_episode.get_completed(done)
-            total_cell_states += cell_states_episode.get_completed(done)
+        values_episode = TrainingObject_parallel(args.envs_per_worker)
+        terminals_episode = TrainingObject_parallel(args.envs_per_worker)
+        texts_inputs_episode = TrainingObject_parallel(args.envs_per_worker)
+        actions_masks_episode = TrainingObject_parallel(args.envs_per_worker)
+        actions_length_episode = TrainingObject_parallel(args.envs_per_worker)
+        actions_directions_episode = TrainingObject_parallel(args.envs_per_worker)
+        actions_length_log_probs_episode = TrainingObject_parallel(args.envs_per_worker)
+        actions_directions_log_probs_episode = TrainingObject_parallel(args.envs_per_worker)
+        rewards_episode = TrainingObject_parallel(args.envs_per_worker)
+        hidden_states_episode = TrainingObject_parallel(args.envs_per_worker, False)
+        cell_states_episode = TrainingObject_parallel(args.envs_per_worker,False)
 
-            r_index = 0
-            for i in range(done.shape[0]):
-                if done[i] == 1:
-                    #writer.add_scalar("distance",env_params[i][0],counter.iter_index)
-                    writer.add_scalar("width",env_params[i][0],counter.iter_index)
-                    writer.add_scalar("height",env_params[i][1],counter.iter_index)
-                    teacher.record_train_episode(retrn[r_index][0], counter.iter_index,env_params[i])
-                    r_index+=1
+        total_actions_length_log_probs = []
+        total_actions_directions_log_probs = []
+        total_values = []  
+        total_texts_inputs = []
+        total_actions_length = []
+        total_actions_directions = []
+        total_terminals = []   
+        total_action_masks = []
+        total_next_values = []
+        total_rewards   = []
+        total_returns = []
+        total_advantages = []
+        total_hidden_states = []
+        total_cell_states = []
 
-            if counter.iter_epoch <  args.num_steps:
-                for i in range(args.parallel_workers):
-                    if done[i] == 1:
-                        params = teacher.get_env_params()
-                        env_params[i] = params
+        for i in range(args.envs_per_worker):
+            params = teacher.get_env_params()
+            env_params.append(params)
+
+        
+
+        text_input,mask = env.reset(env_params,env.dummy_obs,env.dummy_mask, done_true) 
+        text_input,mask = normalizedEnv.reset(text_input,mask,done_true)
+
+        model.get_init_state(args.envs_per_worker,device)
+        
+        while counter.iter_epoch < args.num_steps or 0 in done:#done.sum() != args.parallel_workers:
+            start = time.time()
+
+            #inference_start_time = time.time()
+
+            hidden_state = model.hidden_cell[0]
+            cell_state = model.hidden_cell[1]
+
+            writer.add_histogram('text,',text_input,counter.iter_index)
+
+            text_input = torch.FloatTensor(text_input).to(device)
+            mask = torch.BoolTensor(mask).to(device)
+
+        
+            if normalizedEnv.ob_rms:
+                writer.add_histogram('text_mean,',normalizedEnv.ob_rms.mean,counter.iter_index)
+                writer.add_histogram('text_std,',np.sqrt(normalizedEnv.ob_rms.var),counter.iter_index)
 
 
-                text_input,mask = env.reset(env_params,text_input,mask,done) 
-                text_input,mask = normalizedEnv.reset(text_input,mask,done)
+            action_length_dist,action_direction_dist,value = model(text_input,mask)
 
-                done = np.full((args.parallel_workers, 1), 0)
+            action_direction = action_direction_dist.sample().reshape(-1,1)
+            action_length = action_length_dist.sample().expand_as(action_direction)
 
-                model.get_init_state(args.parallel_workers,device)
-            else:
+            action = np.concatenate((action_length.cpu().numpy()*10,action_direction.cpu().numpy()), axis=-1)
+
+            next_text_input, next_mask,reward,done = env.step(action,done,reward,text_input.cpu().numpy())
+            
+            #print(done)
+
+            done_bool,successful_ep = check_done(done)
+
+            #inference_end_time = time.time()
+            #writer.add_scalar('time for inference in ms',(inference_end_time - inference_start_time)*1000,counter.iter_index)
+
+
+            #reward_start_time = time.time()
+
+            #print("reward without normalization", reward)
+            writer.add_histogram('env rewards without normalization,',reward,counter.iter_index)
+            next_text_input,normalized_reward = normalizedEnv.step(next_text_input,reward,done)
+            #print("reward with normalization", normalized_reward)
+
+            writer.add_histogram('env rewards with normalization,',normalized_reward,counter.iter_index)
+
+            #reward_end_time = time.time()
+
+            #print(f'time for reward adding:{(reward_end_time - reward_start_time)*1000}') 
+            #writer.add_scalar('time for reward adding in ms',(reward_end_time - reward_start_time)*1000,counter.iter_index)
+
+            #storing_data_start_time = time.time()
+            action_log_prob = action_length_dist.log_prob(action_length)            
+            axis_log_prob = action_direction_dist.log_prob(action_direction.flatten()).reshape(-1,1)
+
+
+            actions_length_log_probs_episode.append(action_log_prob.cpu(),done)
+            actions_directions_log_probs_episode.append(axis_log_prob.cpu(),done)
+            values_episode.append(value.cpu(),done)
+            terminals_episode.append(torch.FloatTensor(1 - done_bool).cpu(),done)        
+            texts_inputs_episode.append(text_input.cpu(),done)
+            actions_masks_episode.append(mask.cpu(),done)
+            actions_length_episode.append(action_length.cpu(),done)
+            actions_directions_episode.append(action_direction.cpu(),done)
+            rewards_episode.append(torch.FloatTensor(normalized_reward).cpu(),done)
+            hidden_states_episode.append(hidden_state.cpu(),done)
+            cell_states_episode.append(cell_state.cpu(),done)
+    
+            text_input = next_text_input
+            mask = next_mask
+
+            counter.iter_index += args.envs_per_worker - np.count_nonzero(done == -1)
+            counter.iter_epoch += args.envs_per_worker - np.count_nonzero(done == -1)
+            counter.iter_test += args.envs_per_worker - np.count_nonzero(done == -1)
+
+            #storing_data_end_time = time.time()
+            #writer.add_scalar('time for storing data in ms',(storing_data_end_time - storing_data_start_time)*1000,counter.iter_index)
+
+            if 1 in done:
+                #inside_start_time = time.time()
+
+                num_episodes += np.count_nonzero(done == 1)
+
+                if successful_ep.sum() > 0:
+                    counter.iter_successful_ep += successful_ep.sum()
+
+                print(f"number of completed episodes: {num_episodes}")
+
+                next_text_input = torch.FloatTensor(text_input).to(device)
+                next_mask = torch.BoolTensor(mask).to(device)
+    
+
+                _,_,next_value = model(next_text_input,next_mask)             
+                    
+                next_value = values_episode.get_next_value(next_value.cpu(),done)
+                valus = values_episode.get_completed(done)
+                termnls = terminals_episode.get_completed(done)
+                rewards = rewards_episode.get_completed(done)
+
+                retrn,advantage = values_episode.compute_gae(next_value, rewards, termnls, valus)
+
+
+                
+
+                total_terminals +=termnls
+                total_values +=valus
+                total_next_values += next_value
+                total_rewards += rewards
+                total_returns += retrn
+                total_advantages+=advantage
+                total_texts_inputs += texts_inputs_episode.get_completed(done)
+                total_actions_length += actions_length_episode.get_completed(done)
+                total_actions_directions += actions_directions_episode.get_completed(done)
+                total_action_masks +=actions_masks_episode.get_completed(done)            
+                total_actions_length_log_probs +=actions_length_log_probs_episode.get_completed(done)
+                total_actions_directions_log_probs += actions_directions_log_probs_episode.get_completed(done)
+                total_hidden_states += hidden_states_episode.get_completed(done)
+                total_cell_states += cell_states_episode.get_completed(done)
+
+                r_index = 0
                 for i in range(done.shape[0]):
                     if done[i] == 1:
-                        done[i] = -1
+                        #writer.add_scalar("distance",env_params[i][0],counter.iter_index)
+                        writer.add_scalar("width",env_params[i][0],counter.iter_index)
+                        writer.add_scalar("height",env_params[i][1],counter.iter_index)
+                        teacher.record_train_episode(retrn[r_index][0], counter.iter_index,env_params[i])
+                        r_index+=1
 
-            #inside_end_time = time.time()
-            #writer.add_scalar('time for inside in ms',(inside_end_time - inside_start_time)*1000,counter.iter_index)
+                if counter.iter_epoch <  args.num_steps:
+                    for i in range(args.envs_per_worker):
+                        if done[i] == 1:
+                            params = teacher.get_env_params()
+                            env_params[i] = params
 
-        print(f'**[ITERATION NUMBER: {counter.iter_index}]**')
-        print(f'epoch_steps number: {counter.iter_epoch}')
-    
-            
-        end = time.time()
-        total_iter_time = end - start
-        writer.add_scalar('Iteration time in ms',total_iter_time*1000/args.parallel_workers,counter.iter_index)
-        print(f'time for one iteration is :{total_iter_time*1000/args.parallel_workers}')      
 
-    print(f"FINISH COLLECTING TRAJ")
+                    text_input,mask = env.reset(env_params,text_input,mask,done) 
+                    text_input,mask = normalizedEnv.reset(text_input,mask,done)
 
-    env.clear()
+                    done = np.full((args.envs_per_worker, 1), 0)
 
-    traj = {"actions_length_log_probs":total_actions_length_log_probs,
-            "actions_directions_log_probs":total_actions_directions_log_probs,
-            "values":total_values,"next_values":total_next_values,"text_inputs":total_texts_inputs,
-            "actions_length":total_actions_length,
-            "actions_directions":total_actions_directions,"actions_mask":total_action_masks
-            ,"terminals": total_terminals,"returns": total_returns, "advantages": total_advantages
-            ,"rewards":total_rewards,"hidden_states": total_hidden_states
-            , "cell_states": total_cell_states}
+                    model.get_init_state(args.envs_per_worker,device)
+                else:
+                    for i in range(done.shape[0]):
+                        if done[i] == 1:
+                            done[i] = -1
 
-    return traj
+                #inside_end_time = time.time()
+                #writer.add_scalar('time for inside in ms',(inside_end_time - inside_start_time)*1000,counter.iter_index)
+
+            print(f'**[ITERATION NUMBER: {counter.iter_index}]**')
+            print(f'epoch_steps number: {counter.iter_epoch}')
+        
+                
+            end = time.time()
+            total_iter_time = end - start
+            writer.add_scalar('Iteration time in ms',total_iter_time*1000/args.envs_per_worker,counter.iter_index)
+            print(f'time for one iteration is :{total_iter_time*1000/args.envs_per_worker}')      
+
+        print(f"FINISH COLLECTING TRAJ")
+
+        env.clear()
+
+        traj = {"actions_length_log_probs":total_actions_length_log_probs,
+                "actions_directions_log_probs":total_actions_directions_log_probs,
+                "values":total_values,"next_values":total_next_values,"text_inputs":total_texts_inputs,
+                "actions_length":total_actions_length,
+                "actions_directions":total_actions_directions,"actions_mask":total_action_masks
+                ,"terminals": total_terminals,"returns": total_returns, "advantages": total_advantages
+                ,"rewards":total_rewards,"hidden_states": total_hidden_states
+                , "cell_states": total_cell_states}
+        
+        q_traj.put(traj)
+
+        #return traj
 
 @torch.no_grad()
 def test_ursina(model,env,teacher,normalizedEnv,counter,args,image_args,device):
@@ -309,7 +320,7 @@ def test_ursina(model,env,teacher,normalizedEnv,counter,args,image_args,device):
     counter.test_average_reward = total_reward.sum()/args.parallel_workers_test
     counter.test_average_steps = total_steps.sum()/args.parallel_workers_test
 
-    #env.clear()
+    env.clear()
     print("[EXIT TEST LOOP]")
 
 
@@ -416,3 +427,38 @@ def ppo_iter(mini_batch_size, text_inputs,actions_length,actions_direction,actio
     for _ in range(batch_size // mini_batch_size):
         rand_ids = np.random.randint(0, batch_size, mini_batch_size)
         yield text_inputs[rand_ids, :], actions_length[rand_ids, :],actions_direction[rand_ids, :] ,actions_length_log_probs[rand_ids, :],actions_directions_log_probs[rand_ids, :] ,returns[rand_ids, :], advantages[rand_ids, :],action_masks[rand_ids, :],values[rand_ids, :],hidden_states[:,rand_ids, :],cell_states[:,rand_ids, :]
+
+def collector(q_traj):
+    traj = {"actions_length_log_probs":[],
+            "actions_directions_log_probs":[],
+            "values":[],"next_values":[],"text_inputs":[],
+            "actions_length":[],
+            "actions_directions":[],"actions_mask":[]
+            ,"terminals": [],"returns": [], "advantages": []
+            ,"rewards":[],"hidden_states": []
+            , "cell_states": []}
+
+    while True:
+        time.sleep(1)
+        if q_traj.full():
+            print("is full", q_traj.full())
+            break
+    
+    while not q_traj.empty():
+        t = q_traj.get()
+        traj["text_inputs"] += t["text_inputs"]
+        traj["actions_length"] += t["actions_length"]
+        traj["actions_directions"] += t["actions_directions"]
+        traj["actions_length_log_probs"] += t["actions_length_log_probs"]
+        traj["actions_directions_log_probs"] += t["actions_directions_log_probs"]
+        traj["actions_mask"] += t["actions_mask"]
+        traj["values"] += t["values"]
+        traj["next_values"] += t["next_values"]
+        traj["terminals"] += t["terminals"]
+        traj["hidden_states"] +=t["hidden_states"]
+        traj["cell_states"] +=t["cell_states"]
+        traj["rewards"] +=t["rewards"]
+        traj["returns"] +=t["returns"]
+        traj["advantages"] += t["advantages"]
+
+    return traj
