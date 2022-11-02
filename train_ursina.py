@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import random
 from Teacher import get_teacher
-from vec_normalize_parallel import NormalizedEnv
+from vec_normalize_parallel import NormalizedEnv,NormalizedEnv_wrapper
 from train_utils import ppo_update,get_epoch_trajectories_ursina,test_ursina,to_torch_tensor,collector
 from utils import images_args,load_model,get_data_statistics,save_model,create_data_stat
 from torch.utils.tensorboard import SummaryWriter
@@ -16,8 +16,7 @@ import torch.backends.cudnn
 from counter import Counter
 from env_ursina import parallel_envs,mul_parallel_envs
 import warnings
-from gpu_usage import print_gpu_memory_every_5secs
-from modified_thread import thread_with_exception
+import threading
 import queue
 
 warnings.filterwarnings('ignore')
@@ -27,21 +26,21 @@ parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
 parser.add_argument('--max_grad_norm', type=float, default=0.5, help='Learning rate for discriminator')
 parser.add_argument('--critic_loss_coeff', type=float, default=0.5, help='Learning rate for discriminator')
 parser.add_argument('--entropy_coeff', type=float, default=0.01, help='Learning rate for discriminator')
-parser.add_argument('--bs', type=int, default=200, help='Batch size')
+parser.add_argument('--bs', type=int, default=2000, help='Batch size')
 parser.add_argument('--ppo_epochs', type=int, default=5, help='Number of epochs')
 parser.add_argument('--text_input_length', type=int, default=413, help='406 Number of features in text input')
 parser.add_argument('--depth_map_length', type=int, default=361, help='361 Number of features in text input')
 parser.add_argument('--action_direction_length', type=int, default=29, help='possible actions')
 parser.add_argument('--max_action_length', type=int, default=10, help='the max action length')
-parser.add_argument('--num_steps', type=int, default=200, help='number of steps per epoch')
-parser.add_argument('--test_steps', type=int, default=200, help='number of steps per epoch')
+parser.add_argument('--num_steps', type=int, default=2000, help='number of steps per epoch')
+parser.add_argument('--test_steps', type=int, default=2000, help='number of steps per epoch')
 parser.add_argument('--seed', type=int, default=7, help='seed to initialize libraries')
 parser.add_argument('--max_iter', type=int, default=3000000, help='max number of steps')
 parser.add_argument('--load_model', type=bool, default=False, help='load a pretrained model')
 parser.add_argument('--compute_dynamic_stat', type=bool, default=True, help='collect the agents data in parallel')
 parser.add_argument('--anneal_lr', type=bool, default= False, help='collect the agents data in parallel')
-parser.add_argument('--parallel_workers_test', type=int, default=10, help='number of parallel agents')
-parser.add_argument('--parallel_workers', type=int, default=4, help='number of parallel agents')
+parser.add_argument('--parallel_workers_test', type=int, default=9, help='number of parallel agents')
+parser.add_argument('--parallel_workers', type=int, default=3, help='number of parallel agents')
 parser.add_argument('--envs_per_worker', type=int, default=3, help='number of parallel agents')
 parser.add_argument('--sageMaker', type=bool, default=False, help='number of parallel agents')
 
@@ -56,9 +55,6 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
     num_updates = 1000000 // args.num_steps
     update = 1
 
-    gamma = 0.99
-    decay = 0.5**(1./20)
-
     envs = []
     norm_envs = []
     for i in range(args.parallel_workers):
@@ -67,8 +63,8 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         normalizedEnv = NormalizedEnv(np.zeros(shape=(1,args.text_input_length)).shape,args.envs_per_worker,args.depth_map_length)
         norm_envs.append(normalizedEnv)
 
+    norm_envs_wrapper = NormalizedEnv_wrapper(norm_envs,np.zeros(shape=(1,args.text_input_length)).shape)
     test_env = mul_parallel_envs(envs,args.parallel_workers_test,args.text_input_length,args.action_direction_length)
-  
     worker_threads = []
     model_queues = []
     q_traj = queue.Queue(maxsize=args.parallel_workers)
@@ -76,13 +72,12 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         q_model = queue.Queue()
         q_model.put(model.state_dict())
         model_queues.append(q_model)
-        thread = thread_with_exception(target=get_epoch_trajectories_ursina, args=(None,envs[i],teacher,norm_envs[i],counter,writer,device,args,q_model,q_traj))
+        thread = threading.Thread(target=get_epoch_trajectories_ursina, args=(None,envs[i],teacher,norm_envs[i],counter,writer,device,args,q_model,q_traj))
         thread.start()
         worker_threads.append(thread)
         
-
     while True:
-           
+        
         counter.epochs_counter +=1
 
         counter.iter_successful_ep = 0
@@ -96,6 +91,8 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         #traj = get_epoch_trajectories_ursina(model,env,teacher,normalizedEnv,counter,writer,device,args,image_args)
         
         traj = collector(q_traj)
+
+        norm_envs_wrapper.sync()
 
         iter_idx = counter.iter_index
 
@@ -138,8 +135,7 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         print("successful_ep", counter.iter_successful_ep)
         writer.add_scalar('successful_ep',counter.iter_successful_ep/(len(traj["text_inputs"])),iter_idx)
         
-        if normalizedEnv.ob_rms:
-            create_data_stat(model_dir,normalizedEnv.ob_rms.mean, np.sqrt(normalizedEnv.ob_rms.var))
+        create_data_stat(model_dir,norm_envs_wrapper.obs_mean, np.sqrt(norm_envs_wrapper.obs_var))
 
         text_input = to_torch_tensor(traj["text_inputs"])
         actions_length = to_torch_tensor(traj["actions_length"])
@@ -161,10 +157,8 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         print("[START TRAINING PPO]")
         ppo_training_start_time = time.time()
 
-        writer.add_scalar("gamma",gamma,iter_idx)
-
   
-        ppo_update(device,gamma,args.ppo_epochs, args.bs,text_input,actions_length,actions_directions,
+        ppo_update(device,args.ppo_epochs, args.bs,text_input,actions_length,actions_directions,
             actions_length_log_probs,actions_directions_log_probs,returns,advantages,
             actions_mask,values,hidden_states, cell_states,counter,optimizer,model,writer,args)
 
@@ -178,8 +172,6 @@ def train_ppo(env,model,optimizer,normalizedEnv,writer,teacher,counter,image_arg
         writer.add_scalar('PPO Training time in s',total_ppo_training_time,iter_idx)
         print("[finish TRAINING PPO]")
 
-
-        gamma *= decay
 
         writer.add_histogram('advantages,',advantages,iter_idx)
         writer.add_histogram('returns,',returns,iter_idx)
@@ -207,8 +199,6 @@ if __name__ == '__main__':
     image_args = images_args()
 
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-
-    print_gpu_memory_every_5secs()
 
     torch.random.manual_seed(args.seed)
     torch.manual_seed(args.seed)

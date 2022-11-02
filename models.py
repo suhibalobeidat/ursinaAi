@@ -86,8 +86,6 @@ class ActorCritic(nn.Module):
         if hidden_cell is not None:
             self.hidden_cell = hidden_cell
 
-        print("TRAINING DEVICE: ", text_input.get_device())
-
         if self.depth_map_length != 0:
             t_input = text_input[:,self.depth_map_length:]
             depth_map = text_input[:,0:self.depth_map_length]

@@ -158,3 +158,37 @@ class NormalizedEnv:
 
 
         return obs,mask
+
+class NormalizedEnv_wrapper:
+    def __init__(self,norm_envs,obs_shape):
+        self.shape = obs_shape
+        self.obs_mean = np.zeros(self.shape, "float64")
+        self.obs_var = np.zeros(self.shape, "float64")
+        self.norm_envs = norm_envs
+
+    def sync(self):
+        mean = np.zeros(self.shape, "float64")
+        var = np.zeros(self.shape, "float64")
+
+        ret_mean = np.zeros(1, "float64")
+        ret_var = np.zeros(1, "float64")
+
+        for i in range(len(self.norm_envs)):
+            mean += self.norm_envs[i].ob_rms.mean
+            var += self.norm_envs[i].ob_rms.var
+            ret_mean += self.norm_envs[i].ret_rms.mean
+            ret_var += self.norm_envs[i].ret_rms.var
+
+        mean/=len(self.norm_envs)
+        var/=len(self.norm_envs)
+        ret_mean/=len(self.norm_envs)
+        ret_var/=len(self.norm_envs)
+
+        for i in range(len(self.norm_envs)):
+            self.norm_envs[i].ob_rms.mean = mean
+            self.norm_envs[i].ob_rms.var = var
+            self.norm_envs[i].ret_rms.mean = ret_mean
+            self.norm_envs[i].ret_rms.var = ret_var
+
+        self.obs_mean = mean
+        self.obs_var = var
