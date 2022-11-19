@@ -37,3 +37,9 @@ class Commands(enum.Enum):
    get_action = 3
    done = 4
    clear = 5
+
+
+class ActionSpace(enum.Enum):
+   DISCRETE = 0
+   CONTINUOUS = 1
+   MIXED = 2

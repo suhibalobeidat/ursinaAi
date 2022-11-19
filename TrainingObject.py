@@ -36,7 +36,6 @@ class TrainingObject_parallel():
     def compute_gae(self,next_value,reward, terminals, value, gamma=0.99, tau=0.95):
         completed_episodes_returns = []
         completed_episodes_advantages = []
-        #teacher_returns = []
 
         for i in range(len(value)):
             values = value[i].copy()
@@ -46,9 +45,7 @@ class TrainingObject_parallel():
             gae = 0
             returns = []
             advantages = []
-            #t_return = 0
             for step in reversed(range(len(rewards))):
-                #t_return += gamma*rewards[step]
                 retrn = rewards[step] + gamma * values[step + 1] * masks[step]
                 delta = retrn - values[step]
                 gae = delta + gamma * tau * masks[step] * gae
@@ -56,5 +53,5 @@ class TrainingObject_parallel():
                 advantages.insert(0,gae)
             completed_episodes_returns.append(returns)
             completed_episodes_advantages.append(advantages)
-           # teacher_returns.append(t_return)
-        return completed_episodes_returns,completed_episodes_advantages#,t_return
+            
+        return completed_episodes_returns,completed_episodes_advantages

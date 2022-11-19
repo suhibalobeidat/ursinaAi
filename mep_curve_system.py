@@ -4,6 +4,7 @@ from mep_curve_segmant import *
 from enums import *
 import numpy as np
 from transform import Transform
+import logging
 
 class System():
     def __init__(self,shape,max_iteration,detection_distance = 30,max_distance_to_goal = 5,radius_mul = 1.5):
@@ -28,6 +29,8 @@ class System():
 
         self.is_create_detection_system = True
         self._is_collision_detection = True
+
+        self.iteration = 0
    
     def set_dim(self,width,height):
         self.width = width/304.8
@@ -252,15 +255,14 @@ class System():
         if not self.is_create_detection_system:
             return 
 
-        """ l = [1]*386
-        self.depth_map = l
-        return l """
+        depth_map = []#[1]*361
+        self.depth_map = depth_map
         
         transform = self.system_connectors[-1]
         origin = transform.origin
 
 
-        depth_map = []
+        """ depth_map = []
 
         for y_angle in range(int(-self.depth_map_yRange/2),int(self.depth_map_yRange/2)+1,self.depth_map_angle_offset):
                 for x_angle in range(int(-self.depth_map_xRange/2),int(self.depth_map_xRange/2)+1,self.depth_map_angle_offset):
@@ -269,7 +271,7 @@ class System():
                     depth_map.append(hit_info.distance/self.detection_distance)
                     #line = draw_line(origin,origin + (direction*hit_info.distance))
                     #print(hit_info.distance)
-        self.depth_map = depth_map
+        self.depth_map = depth_map """
 
         for i in range(2):
             for angle in self.plane_angles:
@@ -355,13 +357,14 @@ class System():
         else:
             distance = vec_len(self.relative_direction_to_goal)
             if is_new_room:
-                reward = 50
-
+                reward = 10
             else:
                 reward = self.get_distance_reward(distance)
-   
-                if self.current_angle == 0:
-                    reward = reward/100
+
+                """ if self.current_angle != 0:
+                    reward = -2#reward/2
+                else:
+                    reward = -1 """
 
         #print("single agent reward", reward)
 
@@ -377,17 +380,17 @@ class System():
         self.min_rect_point = self.transform_point(rect.min,self.system_connectors[-1])
         self.max_rect_point = self.transform_point(rect.max,self.system_connectors[-1])
 
-        x_base = self.system_connectors[-1].x_base
+        """ x_base = self.system_connectors[-1].x_base
         y_base = self.system_connectors[-1].y_base
-        z_base = self.system_connectors[-1].z_base
+        z_base = self.system_connectors[-1].z_base """
 
         state = []
 
         state.extend(self.depth_map)#361 + 25 = 386
 
-        state.extend(vec3_to_list(x_base))#3
+        """ state.extend(vec3_to_list(x_base))#3
         state.extend(vec3_to_list(y_base))#3
-        state.extend(vec3_to_list(z_base))#3
+        state.extend(vec3_to_list(z_base))#3 """
         state.append(self.system_segmants[-1].net_length)#1
 
         state.extend(vec3_to_list(self.min_rect_point))#3
@@ -397,7 +400,7 @@ class System():
         state.append(self.width)#1
         state.append(self.height)#1
 
-        if len(self.system_segmants) == 1:
+        """ if len(self.system_segmants) == 1:
             state.append(self.system_segmants[-1].length)#1
             state.append(0)#1
             state.extend(vec3_to_list(z_base))#3
@@ -414,7 +417,7 @@ class System():
             state.append(self.system_segmants[-2].length)
             state.extend(vec3_to_list(self.system_connectors[-2].z_base)) 
             state.append(self.system_segmants[-3].length)
-            state.extend(vec3_to_list(self.system_connectors[-3].z_base))   
+            state.extend(vec3_to_list(self.system_connectors[-3].z_base))    """
 
         return state
 

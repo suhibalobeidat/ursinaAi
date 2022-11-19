@@ -1,5 +1,5 @@
 import threading
-from enums import ConnectorShape, Commands
+from enums import ConnectorShape, Commands,ActionSpace
 from room_layout import Layout
 from mep_curve_system import System
 from multiprocessing import Queue
@@ -10,23 +10,27 @@ from multiprocessing import Process,Queue
 from ursina import *
 
 
-def create_env(receive_queue,send_queue):
+def create_env(min_size,max_size,receive_queue = None,send_queue = None, same_process = False):
     app = Ursina()
-    #EditorCamera()
-    navigation_env = Navigation_env(receive_queue,send_queue)
+    navigation_env = Navigation_env(min_size,max_size,receive_queue,send_queue)
     app.set_env(navigation_env)
-    app.run()
+
+    if not same_process:
+        app.run()
+    else:
+        return app
 
 class Navigation_env():
-    def __init__(self,receive_queue,send_queue):
+    def __init__(self,min_size,max_size,receive_queue,send_queue):
+        self.action_space = ActionSpace.DISCRETE
         self.receive_queue = receive_queue
         self.send_queue = send_queue
         self.radius_mul = 1
         self.max_iteration = 100
         self.max_room_number = 5
         self.actions = 29
-        self.min_duct_size = 75#mm
-        self.max_duct_size = 200#mm
+        self.min_duct_size = min_size#mm
+        self.max_duct_size = max_size#mm
         self.min_distance = 10#ft
         self.max_distance = 100#ft
         self.system = None
@@ -54,12 +58,12 @@ class Navigation_env():
         self.layout.generate_layout(self.system.system_segmants[-1])
         self.layout.get_path_rects()
 
-        goal_point = self.layout.get_goal_point(distance)
+        #goal_point = self.layout.get_goal_point(distance)
         #goal_point = self.generate_random_point(distance)
 
         
 
-        self.system.set_goal(goal_point)
+        #self.system.set_goal(goal_point)
         self.system.create_detection_system()
 
         total_status = []
@@ -77,8 +81,12 @@ class Navigation_env():
         self.send_queue.put([True])
 
     def step(self,action):
-        if self.system.create_segmant(action[0],action[1]):
-            self.system.create_detection_system()
+        if self.action_space == ActionSpace.DISCRETE:
+            if self.system.create_segmant(0,action[0]):
+                self.system.create_detection_system()   
+        else: 
+            if self.system.create_segmant(action[0],action[1]):
+                self.system.create_detection_system()
 
         next_rect,is_new_room = self.layout.get_next_rect(self.system.system_segmants[-1])
     
@@ -126,6 +134,8 @@ class Navigation_env():
         if len(data) > 1:
             remaining_data = data[1:]
 
+        print("command",command)
+
         if Commands(command) == Commands.init:
             self.init()
         elif Commands(command) == Commands.reset:
@@ -140,39 +150,80 @@ class Navigation_env():
             self.clear()
 
 
-    
+class MyQueue():
+    def __init__(self):
+        self.queue = []
+
+    def put(self,data):
+        self.queue.append(data)
+
+    def get(self):
+        data = self.queue.pop(0)
+        return data
+
+    def empty(self):
+        if len(self.queue) == 0:
+            return True
+        else:
+            return False
+        
+
 class env_interface():
-    def __init__(self,number):
-        self.receive_queue = Queue() 
-        self.send_queue = Queue() 
-        self.process = Process(target=create_env, args=(self.send_queue,self.receive_queue))
-        self.process.start()
+    def __init__(self,min_size,max_size,number = 0, same_process = False):
+        self.same_process = same_process
         self.number = number
+
+        if same_process:
+            self.receive_queue = MyQueue()
+            self.send_queue = MyQueue()
+            self.app = self.process = create_env(min_size,max_size,self.send_queue,self.receive_queue, same_process)
+        else:
+            self.receive_queue = Queue() 
+            self.send_queue = Queue() 
+            self.process = Process(target=create_env, args=(min_size,max_size,self.send_queue,self.receive_queue,same_process))
+            self.process.start()
+        
 
     def init(self):
         data = []
         data.append(0.)
         self.send_queue.put(data)
+
+        if self.same_process:
+            self.app.step()
+        
         received_data = self.receive_queue.get()
+
         return received_data
 
     def reset(self,goal):
+
         data = []
         data.append(1.)
         data.append(20.)
         data.extend(goal)
-        #print("reset", data)
-        self.send_queue.put(data)
 
+        self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
         received_data = self.receive_queue.get()
+
         return received_data
 
     def step(self,action):
+
         data = []
         data.append(2.)
-        data.extend(action)
-        self.send_queue.put(data)
 
+        if isinstance(action,list):
+            data.extend(action)
+        else:
+            data.append(action)
+            data.append(0)
+
+        self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
         received_data = self.receive_queue.get()
 
         return received_data
@@ -181,6 +232,8 @@ class env_interface():
         data = []
         data.append(3.)
         self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
         received_data = self.receive_queue.get()
         return received_data
 
@@ -188,6 +241,8 @@ class env_interface():
         data = []
         data.append(4.)
         self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
         received_data = self.receive_queue.get() 
         return received_data[0]
 
@@ -195,6 +250,8 @@ class env_interface():
         data = []
         data.append(5.)
         self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
         received_data = self.receive_queue.get()
         return received_data
 
@@ -216,7 +273,7 @@ class parallel_envs():
     def init(self):
         threads = []
         for i in range(self.parallel_envs_count):
-            env = env_interface(i)
+            env = env_interface(75,250,i)
             self.envs.append(env)  
             threads.append(threading.Thread(target=env.init))   
 

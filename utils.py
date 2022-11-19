@@ -1,9 +1,8 @@
-import cv2
 import numpy as np
 import h5py
 import torch
 import os.path
-
+import gym
 
 def get_data_statistics(file_name):
     file = h5py.File(file_name, "r+")
@@ -64,4 +63,5 @@ def create_data_stat(dir,texts_mean,texts_std):
             "texts_std", np.shape(texts_std), data=texts_std
         )
     file.close()
+
 
