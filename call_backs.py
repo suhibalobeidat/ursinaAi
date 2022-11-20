@@ -6,4 +6,4 @@ class MyCallBacks(DefaultCallbacks):
         super.__init__()
 
     def on_sample_end(self, *, worker: "RolloutWorker", samples: SampleBatch, **kwargs) -> None:
-        return super().on_sample_end(worker=worker, samples, **kwargs)
+        return None
