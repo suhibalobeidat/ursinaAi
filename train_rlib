@@ -30,9 +30,38 @@ parser.add_argument('--sageMaker', type=bool, default=False, help='number of par
 
 
 
+if __name__ == '__main__':
+    args = parser.parse_args()
 
 
-env_config = {"obs_size":34,"mask_size":29,"min_size":75,"max_size":250,"is_teacher":True}
 
-register_env("UrsinaGym", make_env)
-ModelCatalog.register_custom_model("rlib_model", rlib_model)
+    register_env("UrsinaGym", make_env)
+    ModelCatalog.register_custom_model("rlib_model", rlib_model)
+
+    config = {
+    "framework": "torch",
+    "num_workers": 2,
+    "num_gpus_per_worker": 1/args.parallel_workers,
+    "num_envs_per_worker": 2,
+    "rollout_fragment_length": 100,
+    "batch_mode": "complete_episodes",
+    "train_batch_size": 1000,
+    "gamma": 0.99,
+    "lr": 0.0001,
+    "env":"UrsinaGym",
+    "env_config":{
+        "obs_size":34,
+        "mask_size":29,"min_size":75,
+        "max_size":250,
+        "is_teacher":True},
+    "model": {
+         "custom_model":"rlib_model",
+         "custom_model_config": {
+            "obs":args.text_input_length,
+            "action_mask": args.action_direction_length,
+            "hidden_layer":128},},
+    "recreate_failed_workers":True,
+    "restart_failed_sub_environments":True,
+    "remote_worker_envs": True,
+    "remote_env_batch_wait_ms": 1,
+    }
