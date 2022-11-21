@@ -35,9 +35,8 @@ class UrsinaGym(gym.Env):
         #print("INIT IS DONE")
 
 
-    def reset(self, seed=None, options=None):
+    def reset(self):
         # We need the following line to seed self.np_random
-        super().reset(seed=seed)
 
         if self.is_teacher:
             self.params = self.teacher.get_env_params()
@@ -94,9 +93,9 @@ class UrsinaGym(gym.Env):
         return None
 
 
-def make_env(env_config):
+def make_env(env_config = None)-> gym.Env:
     env = UrsinaGym(env_config)
-    env = NormalizeReward(env)
-    env = NormalizeObservation(env)
+    #env = NormalizeReward(env)
+    #env = NormalizeObservation(env)
 
-    return env 
+    return env

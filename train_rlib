@@ -4,6 +4,9 @@ import argparse
 from ray.rllib.models import ModelCatalog
 from models import rlib_model
 from call_backs import MyCallBacks
+from ray.rllib.evaluation.rollout_worker import RolloutWorker
+from gym_ursina import UrsinaGym
+import gym
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -60,10 +63,49 @@ if __name__ == '__main__':
          "custom_model_config": {
             "obs":args.text_input_length,
             "action_mask": args.action_direction_length,
-            "hidden_layer":128},},
+            "hidden_layer":128}},
     "recreate_failed_workers":True,
     "restart_failed_sub_environments":True,
     "remote_worker_envs": True,
     "remote_env_batch_wait_ms": 1,
     "callbacks": MyCallBacks,
     }
+
+
+    model_config = {
+        "name":"rlib_model",
+        "obs":args.text_input_length,
+        "action_mask": args.action_direction_length,
+        "hidden_layer":128}
+    
+    env_config = {
+        "obs_size":34,
+        "mask_size":29,
+        "min_size":75,
+        "max_size":250,
+        "is_teacher":False}
+
+    from ray.rllib.algorithms.pg.pg_torch_policy import PGTorchPolicy
+    from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
+
+    """ env = gym.make("CartPole-v1")
+    print(type(env)) """
+
+
+    """ worker = RolloutWorker( 
+    env_creator=lambda _: gym.make("CartPole-v1"), 
+    policy_spec=PPOTorchPolicy,policy_config={"framework": "torch"})  """
+    
+    """ worker = RolloutWorker(env_creator=lambda _: make_env(env_config),episode_horizon=200
+    ,policy_spec=rlib_model,num_envs=2,model_config=model_config
+    ,policy_config={"framework": "torch"}
+    ) 
+ """
+    worker = RolloutWorker(env_creator=lambda _: make_env(env_config),episode_horizon=200
+    ,policy_spec=PPOTorchPolicy,policy_config={"framework": "torch"},model_config=model_config,
+    callbacks=MyCallBacks, num_envs=2,remote_worker_envs=2) 
+
+    samples = worker.sample()
+
+    print(worker.num_envs)
+    print(worker.num_workers)
