@@ -9,6 +9,8 @@ from gym.wrappers.normalize import NormalizeReward, NormalizeObservation
 class UrsinaGym(gym.Env):
     def __init__(self,env_config):
 
+        
+
         mask_size = env_config["mask_size"]
         obs_size = env_config["obs_size"]
         min_size = env_config["min_size"]
@@ -84,10 +86,10 @@ class UrsinaGym(gym.Env):
             if terminated or truncated:
                 self.teacher.record_train_episode(self.teacher_ret, 0,self.params)
 
-
+        info = {"truncated":truncated}
         #print("STEP IS DONE")
 
-        return observation, reward, terminated, {}
+        return observation, reward, terminated, info
 
     def render(self):
         return None

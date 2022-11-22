@@ -1,10 +1,16 @@
-import math
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from CategoricalMasked import CategoricalMasked
 from ray.rllib.utils.torch_utils import FLOAT_MIN
-
+from typing import Dict, Optional
+from ray.rllib.evaluation.episode import Episode
+from ray.rllib.policy.policy import Policy
+from ray.rllib.policy.sample_batch import SampleBatch
+from ray.rllib.utils.typing import AgentID
+from ray.rllib.evaluation.postprocessing import compute_advantages
+from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
 
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
@@ -103,3 +109,54 @@ class rlib_model(TorchModelV2,nn.Module):
 
     def value_function(self):
         return self.value
+
+
+class MyPPOTorchPolicy(PPOTorchPolicy):
+
+    def postprocess_trajectory(
+        self, sample_batch, other_agent_batches=None, episode=None
+    ):
+        # Do all post-processing always with no_grad().
+        # Not using this here will introduce a memory leak
+        # in torch (issue #6962).
+        # TODO: no_grad still necessary?
+        with torch.no_grad():
+            return compute_gae_for_sample_batch(
+                self, sample_batch, other_agent_batches, episode
+            )
+
+
+def compute_gae_for_sample_batch(
+    policy: Policy,
+    sample_batch: SampleBatch,
+    other_agent_batches: Optional[Dict[AgentID, SampleBatch]] = None,
+    episode: Optional[Episode] = None,
+    ) -> SampleBatch:
+
+    last_r = 0.0
+
+    if not isinstance(sample_batch[SampleBatch.INFOS][-1],np.float32):
+        if sample_batch[SampleBatch.INFOS][-1]["truncated"]:
+            # Input dict is provided to us automatically via the Model's
+            # requirements. It's a single-timestep (last one in trajectory)
+            # input_dict.
+            # Create an input dict according to the Model's requirements.
+            input_dict = sample_batch.get_single_step_input_dict(
+                policy.model.view_requirements, index="last"
+            )
+            last_r = policy._value(**input_dict)
+
+    # Adds the policy logits, VF preds, and advantages to the batch,
+    # using GAE ("generalized advantage estimation") or not.
+    batch = compute_advantages(
+        sample_batch,
+        last_r,
+        policy.config["gamma"],
+        policy.config["lambda"],
+        use_gae=policy.config["use_gae"],
+        use_critic=policy.config.get("use_critic", True),
+    )
+
+    return batch
+
+

@@ -2,8 +2,7 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model
-from call_backs import MyCallBacks
+from models import rlib_model,MyPPOTorchPolicy
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from gym_ursina import UrsinaGym
 import gym
@@ -68,7 +67,6 @@ if __name__ == '__main__':
     "restart_failed_sub_environments":True,
     "remote_worker_envs": True,
     "remote_env_batch_wait_ms": 1,
-    "callbacks": MyCallBacks,
     }
 
 
@@ -85,27 +83,14 @@ if __name__ == '__main__':
         "max_size":250,
         "is_teacher":False}
 
-    from ray.rllib.algorithms.pg.pg_torch_policy import PGTorchPolicy
-    from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
-
-    """ env = gym.make("CartPole-v1")
-    print(type(env)) """
 
 
-    """ worker = RolloutWorker( 
-    env_creator=lambda _: gym.make("CartPole-v1"), 
-    policy_spec=PPOTorchPolicy,policy_config={"framework": "torch"})  """
-    
-    """ worker = RolloutWorker(env_creator=lambda _: make_env(env_config),episode_horizon=200
-    ,policy_spec=rlib_model,num_envs=2,model_config=model_config
-    ,policy_config={"framework": "torch"}
-    ) 
- """
     worker = RolloutWorker(env_creator=lambda _: make_env(env_config),episode_horizon=200
-    ,policy_spec=PPOTorchPolicy,policy_config={"framework": "torch"},model_config=model_config,
-    callbacks=MyCallBacks, num_envs=2,remote_worker_envs=2) 
+    ,policy_spec=MyPPOTorchPolicy,policy_config={"framework": "torch"},model_config=model_config,
+     num_envs=2,remote_worker_envs=2,batch_mode="complete_episodes") 
 
     samples = worker.sample()
+    print("final samples", samples)
 
     print(worker.num_envs)
     print(worker.num_workers)

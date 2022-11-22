@@ -134,7 +134,7 @@ class Navigation_env():
         if len(data) > 1:
             remaining_data = data[1:]
 
-        print("command",command)
+        #print("command",command)
 
         if Commands(command) == Commands.init:
             self.init()
