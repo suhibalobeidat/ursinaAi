@@ -2,10 +2,13 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPOTorchPolicy
+from models import rlib_model,MyPPOTorchPolicy,MyPPO
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
+from ray.rllib.evaluation.worker_set import WorkerSet
+from ray.rllib.policy.sample_batch import SampleBatch
 from gym_ursina import UrsinaGym
-import gym
+import ray
+from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -41,11 +44,15 @@ if __name__ == '__main__':
     register_env("UrsinaGym", make_env)
     ModelCatalog.register_custom_model("rlib_model", rlib_model)
 
-    config = {
+    """ config = {
     "framework": "torch",
-    "num_workers": 2,
+    "num_workers": 1,
     "num_gpus_per_worker": 1/args.parallel_workers,
+    "num_cpus_per_worker":1,
     "num_envs_per_worker": 2,
+    "custom_resources_per_worker":None,
+    "remote_worker_envs": True,
+    "remote_env_batch_wait_ms": 1,
     "rollout_fragment_length": 100,
     "batch_mode": "complete_episodes",
     "train_batch_size": 1000,
@@ -65,8 +72,7 @@ if __name__ == '__main__':
             "hidden_layer":128}},
     "recreate_failed_workers":True,
     "restart_failed_sub_environments":True,
-    "remote_worker_envs": True,
-    "remote_env_batch_wait_ms": 1,
+
     }
 
 
@@ -81,16 +87,85 @@ if __name__ == '__main__':
         "mask_size":29,
         "min_size":75,
         "max_size":250,
-        "is_teacher":False}
+        "is_teacher":False} 
 
 
-
-    worker = RolloutWorker(env_creator=lambda _: make_env(env_config),episode_horizon=200
+    worker = RolloutWorker(env_creator=lambda _: make_env(env_config),rollout_fragment_length=100,
+    episode_horizon=50
     ,policy_spec=MyPPOTorchPolicy,policy_config={"framework": "torch"},model_config=model_config,
-     num_envs=2,remote_worker_envs=2,batch_mode="complete_episodes") 
+     num_envs=6,remote_worker_envs=6,batch_mode="complete_episodes") 
 
     samples = worker.sample()
     print("final samples", samples)
 
     print(worker.num_envs)
-    print(worker.num_workers)
+    print(worker.num_workers)    """
+
+    config = PPOConfig(algo_class=MyPPO)
+    config.model = {
+         "custom_model":"rlib_model",
+         "custom_model_config": {
+            "obs":args.text_input_length,
+            "action_mask": args.action_direction_length,
+            "hidden_layer":128}}  
+    config.env = "UrsinaGym"
+    config.env_config = {
+            "obs_size":34,
+            "mask_size":29,
+            "min_size":75,
+            "max_size":250,
+            "is_teacher":False}
+    config.framework(framework="torch")
+    config.num_envs_per_worker = 1
+    config.num_workers = 0
+    #config.remote_worker_envs = True    
+    config.num_gpus_per_worker = 1/args.parallel_workers
+    config.train_batch_size = 1000
+    config.rollout_fragment_length = 100
+    config.batch_mode = "complete_episodes"
+
+    algo = config.build()
+    #config = config.to_dict()
+
+    # Create our RLlib Trainer.
+    #algo = MyPPO(config=config) 
+    #config = PPOConfig().environment(env="CartPole-v0").training(train_batch_size=4000).framework(framework="torch")
+    #algo = config.build()
+
+
+    # Run it for n training iterations. A training iteration includes
+    # parallel sample collection by the environment workers as well as
+    # loss calculation on the collected batch and a model update.
+    """ for _ in range(3):
+        print(algo.train()) """
+    """ config = PPOConfig(algo_class=MyPPO)
+    config.horizon = 200
+    config.num_envs_per_worker = 1
+    config.num_workers = 1
+    config.env_config = env_config
+    config.model = model_config
+    config.framework(framework="torch")
+    config = config.build(env=UrsinaGym) """
+        
+    """ env = make_env(env_config)
+    policy = MyPPOTorchPolicy(env.observation_space,env.action_space,{})
+    workers = WorkerSet(
+    policy_class=MyPPOTorchPolicy,
+    env_creator=lambda c: make_env(env_config),
+    num_workers=1,trainer_config=config) """
+
+""" for i in range(3):
+    # Gather a batch of samples.
+    T1 = SampleBatch.concat_samples(
+        ray.get([w.sample.remote() for w in workers.remote_workers()]))
+
+    # Improve the policy using the T1 batch.
+    policy.learn_on_batch(T1)
+
+    # The local worker acts as a "parameter server" here.
+    # We put the weights of its `policy` into the Ray object store once (`ray.put`)...
+    weights = ray.put({"default_policy": policy.get_weights()})
+    for w in workers.remote_workers():
+        # ... so that we can broacast these weights to all rollout-workers once.
+        w.set_weights.remote(weights)
+ """

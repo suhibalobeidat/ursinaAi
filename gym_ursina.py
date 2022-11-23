@@ -7,9 +7,9 @@ from Teacher import get_teacher
 from gym.wrappers.normalize import NormalizeReward, NormalizeObservation
 
 class UrsinaGym(gym.Env):
-    def __init__(self,env_config):
 
-        
+
+    def __init__(self,env_config):
 
         mask_size = env_config["mask_size"]
         obs_size = env_config["obs_size"]
@@ -33,6 +33,8 @@ class UrsinaGym(gym.Env):
 
         self.env = env_interface(min_size,max_size,same_process=True)
         self.env.init()
+
+
 
         #print("INIT IS DONE")
 

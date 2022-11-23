@@ -11,6 +11,10 @@ from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.utils.typing import AgentID
 from ray.rllib.evaluation.postprocessing import compute_advantages
 from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
+from ray.rllib.algorithms.ppo import PPO
+from ray.rllib.utils.typing import AlgorithmConfigDict
+from typing import List, Optional, Type, Union
+from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
@@ -59,7 +63,6 @@ class ActorCritic(nn.Module):
         return action_direction,value
 
 
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 
 class rlib_model(TorchModelV2,nn.Module):
     def __init__(self,
@@ -67,19 +70,17 @@ class rlib_model(TorchModelV2,nn.Module):
                  action_space,
                  num_outputs,
                  model_config,
-                 name,
-                 obs=34,
-                 action_mask=29,
-                 hidden_layer = 128):
+                 name):
         TorchModelV2.__init__(self,obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
 
+        obs = model_config["custom_model_config"]["obs"]
+        action_mask = model_config["custom_model_config"]["action_mask"]
+        hidden_layer = model_config["custom_model_config"]["hidden_layer"]
+
 
         self.linear_layers = nn.Sequential(
-            nn.Linear(obs, hidden_layer),
-            nn.ReLU(),
-            nn.Linear(hidden_layer,hidden_layer),
-            nn.ReLU)
+            nn.Linear(obs, hidden_layer))
 
         self.actor_body = nn.Linear(hidden_layer , hidden_layer)
         self.actor_head = nn.Linear(hidden_layer,action_mask)
@@ -108,7 +109,7 @@ class rlib_model(TorchModelV2,nn.Module):
 
 
     def value_function(self):
-        return self.value
+        return self.value.squeeze(1)
 
 
 class MyPPOTorchPolicy(PPOTorchPolicy):
@@ -146,6 +147,7 @@ def compute_gae_for_sample_batch(
             )
             last_r = policy._value(**input_dict)
 
+
     # Adds the policy logits, VF preds, and advantages to the batch,
     # using GAE ("generalized advantage estimation") or not.
     batch = compute_advantages(
@@ -160,3 +162,6 @@ def compute_gae_for_sample_batch(
     return batch
 
 
+class MyPPO(PPO):
+    def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
+        return MyPPOTorchPolicy
