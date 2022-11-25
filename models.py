@@ -15,7 +15,8 @@ from ray.rllib.algorithms.ppo import PPO
 from ray.rllib.utils.typing import AlgorithmConfigDict
 from typing import List, Optional, Type, Union
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
-
+from ray.rllib.models.torch.fcnet import FullyConnectedNetwork 
+from gym import spaces
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -71,45 +72,36 @@ class rlib_model(TorchModelV2,nn.Module):
                  num_outputs,
                  model_config,
                  name):
+
         TorchModelV2.__init__(self,obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
 
-        obs = model_config["custom_model_config"]["obs"]
-        action_mask = model_config["custom_model_config"]["action_mask"]
-        hidden_layer = model_config["custom_model_config"]["hidden_layer"]
+        
+        obs_space = spaces.Box(-100,100,shape=(model_config["custom_model_config"]["obs"],))
+
+        self.model = FullyConnectedNetwork(
+            obs_space, action_space, num_outputs, model_config, name
+        )
 
 
-        self.linear_layers = nn.Sequential(
-            nn.Linear(obs, hidden_layer))
-
-        self.actor_body = nn.Linear(hidden_layer , hidden_layer)
-        self.actor_head = nn.Linear(hidden_layer,action_mask)
-
-
-        self.critic_body =  nn.Linear(hidden_layer, hidden_layer)
-        self.critic_head = nn.Linear(hidden_layer, 1)
 
     def forward(self, input_dict, state, seq_lens):
 
         # Extract the available actions tensor from the observation.
         obs = input_dict["obs"]["obs"]
         action_mask = input_dict["obs"]["action_mask"]
+        input_dict["obs_flat"] = obs
 
-        combined_output = self.linear_layers(obs)
-        
-        logits = F.relu(self.actor_body(combined_output))
-        logits = self.actor_head(logits)
+        logits,state = self.model.forward(input_dict, state, seq_lens)
+  
         inf_mask = torch.clamp(torch.log(action_mask), min=FLOAT_MIN)
         masked_logits = logits + inf_mask
-
-        value = F.relu(self.critic_body(combined_output))
-        self.value = self.critic_head(value)
 
         return masked_logits,state
 
 
     def value_function(self):
-        return self.value.squeeze(1)
+        return self.model.value_function()
 
 
 class MyPPOTorchPolicy(PPOTorchPolicy):
@@ -136,16 +128,21 @@ def compute_gae_for_sample_batch(
 
     last_r = 0.0
 
-    if not isinstance(sample_batch[SampleBatch.INFOS][-1],np.float32):
-        if sample_batch[SampleBatch.INFOS][-1]["truncated"]:
-            # Input dict is provided to us automatically via the Model's
-            # requirements. It's a single-timestep (last one in trajectory)
-            # input_dict.
-            # Create an input dict according to the Model's requirements.
-            input_dict = sample_batch.get_single_step_input_dict(
-                policy.model.view_requirements, index="last"
-            )
-            last_r = policy._value(**input_dict)
+
+    try:
+        is_trancated = sample_batch[SampleBatch.INFOS][-1]["truncated"]   
+    except:
+        is_trancated = True
+
+    if is_trancated:
+        # Input dict is provided to us automatically via the Model's
+        # requirements. It's a single-timestep (last one in trajectory)
+        # input_dict.
+        # Create an input dict according to the Model's requirements.
+        input_dict = sample_batch.get_single_step_input_dict(
+            policy.model.view_requirements, index="last"
+        )
+        last_r = policy._value(**input_dict)
 
 
     # Adds the policy logits, VF preds, and advantages to the batch,
