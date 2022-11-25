@@ -6,7 +6,9 @@ from ray.rllib.utils.typing import AgentID, EnvType, PolicyID
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 from ray.rllib.policy import Policy
 from ray.rllib.env.base_env import BaseEnv
+from ray.rllib.env.env_context import EnvContext
 
 class MyCallBacks(DefaultCallbacks):
-    def on_sample_end(self, *, worker: "RolloutWorker", samples: SampleBatch, **kwargs) -> None:
+    def on_sub_environment_created(self, *, worker: "RolloutWorker", sub_environment: EnvType, env_context: EnvContext, env_index: Optional[int] = None, **kwargs) -> None:
+        
         return None
