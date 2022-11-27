@@ -22,7 +22,7 @@ class InnerEnv(gym.Env):
         self.is_teacher = is_teacher
 
         if self.is_teacher:
-            self.teacher = get_teacher()
+            self.teacher = get_teacher(env_config["teacher_args"])
 
         self.env = env_interface(min_size,max_size,same_process=True)
         self.env.init()
@@ -58,6 +58,9 @@ class InnerEnv(gym.Env):
         elif done == 3:
             terminated = True
             truncated = False
+        elif done == 0:
+            terminated = False
+            truncated = True
         else:
             terminated = bool(done)
             truncated = False

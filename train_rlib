@@ -12,6 +12,7 @@ from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
 from gym.spaces import Box,Discrete,Dict
 from ray import tune
 from call_backs import MyCallBacks
+from Teacher import get_args
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -67,19 +68,22 @@ if __name__ == '__main__':
     samples = worker.sample()
     print("final samples", samples)  """
 
+    teacher_args = get_args()
+
     env_config = {
             "obs_size":34,
             "mask_size":29,
             "min_size":75,
             "max_size":250,
-            "is_teacher":False}
+            "is_teacher":False,
+            "teacher_args":teacher_args}
 
     config = PPOConfig(algo_class=MyPPO)
     config.env = "UrsinaGym"
     config.env_config = env_config
     config.framework(framework="torch")
     config.num_envs_per_worker = 3
-    config.num_workers = 4
+    config.num_workers = 2
     config.remote_worker_envs = True  
     config.num_gpus_per_worker = 1/config.num_workers 
     config.remote_env_batch_wait_ms = 4
@@ -95,6 +99,7 @@ if __name__ == '__main__':
     config.horizon = 100
     config.log_level = "INFO"
     config.simple_optimizer = True
+    config.exploration()
 
     
     tune.register_trainable("MyPPO",MyPPO)

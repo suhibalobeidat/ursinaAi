@@ -2,11 +2,9 @@ import argparse
 from teachDRL.teachers.teacher_controller import TeacherController
 from collections import OrderedDict
 import numpy as np
+parser = argparse.ArgumentParser()
 
-def get_teacher():
-
-    parser = argparse.ArgumentParser()
-
+def get_args():
     parser.add_argument('--teacher', type=str, default="ALP-GMM")  # ALP-GMM, Covar-GMM, RIAC, Oracle, Random
     parser.add_argument('--nb_test_episodes', type=int, default=50)
     parser.add_argument('--seed', '-s', type=int, default=0)
@@ -20,6 +18,11 @@ def get_teacher():
     parser.add_argument('--alp_max_size', type=int, default=None)
 
     args = parser.parse_args()
+
+    return args
+
+
+def get_teacher(args):
 
     params = {}
     if args.teacher == 'ALP-GMM':
@@ -47,14 +50,7 @@ def get_teacher():
 
     param_env_bounds = OrderedDict()
 
-    #param_env_bounds['total_distance'] = [10, 25]
-    param_env_bounds['total_distance'] = [0, 1,2]
-
-    #param_env_bounds['number of spaces away from start point'] = [0,5]
-
-
-
-
+    param_env_bounds['total_distance'] = [0,1,2]
 
     Teacher = TeacherController(args.teacher, args.nb_test_episodes, param_env_bounds,
                                 seed=args.seed, teacher_params=params)
