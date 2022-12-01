@@ -10,13 +10,17 @@ from ray.rllib.policy.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.utils.typing import AgentID
 from ray.rllib.evaluation.postprocessing import compute_advantages
-from ray.rllib.algorithms.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.algorithms.ppo import PPO
 from ray.rllib.utils.typing import AlgorithmConfigDict
 from typing import List, Optional, Type, Union
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.models.torch.fcnet import FullyConnectedNetwork 
 from gym import spaces
+from ray.rllib.algorithms.ppo.my_ppo_torch_policy import MyPPOTorchPolicy
+from ray.rllib.models.torch.torch_action_dist import TorchCategorical
+from ray.rllib.evaluation.rollout_worker import RolloutWorker
+from utils_ursina import correct_value
+
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -103,62 +107,41 @@ class rlib_model(TorchModelV2,nn.Module):
     def value_function(self):
         return self.model.value_function()
 
+class MyActionDist(TorchCategorical):
+    @staticmethod
+    def required_model_output_shape(action_space, model_config):
+        return 7  # controls model output feature vector size
 
-class MyPPOTorchPolicy(PPOTorchPolicy):
+    def __init__(self, inputs, model):
+        super(MyActionDist, self).__init__(inputs, model)
+        assert model.num_outputs == 7
 
-    def postprocess_trajectory(
-        self, sample_batch, other_agent_batches=None, episode=None
-    ):
-        # Do all post-processing always with no_grad().
-        # Not using this here will introduce a memory leak
-        # in torch (issue #6962).
-        # TODO: no_grad still necessary?
-        with torch.no_grad():
-            return compute_gae_for_sample_batch(
-                self, sample_batch, other_agent_batches, episode
-            )
+    def sample(self): ...
+    def logp(self, actions): ...
+    def entropy(self): ...
 
-
-def compute_gae_for_sample_batch(
-    policy: Policy,
-    sample_batch: SampleBatch,
-    other_agent_batches: Optional[Dict[AgentID, SampleBatch]] = None,
-    episode: Optional[Episode] = None,
-    ) -> SampleBatch:
-
-    last_r = 0.0
-
-
-    try:
-        is_trancated = sample_batch[SampleBatch.INFOS][-1]["truncated"]   
-    except:
-        is_trancated = True
-
-    if is_trancated:
-        # Input dict is provided to us automatically via the Model's
-        # requirements. It's a single-timestep (last one in trajectory)
-        # input_dict.
-        # Create an input dict according to the Model's requirements.
-        input_dict = sample_batch.get_single_step_input_dict(
-            policy.model.view_requirements, index="last"
-        )
-        last_r = policy._value(**input_dict)
-
-
-    # Adds the policy logits, VF preds, and advantages to the batch,
-    # using GAE ("generalized advantage estimation") or not.
-    batch = compute_advantages(
-        sample_batch,
-        last_r,
-        policy.config["gamma"],
-        policy.config["lambda"],
-        use_gae=policy.config["use_gae"],
-        use_critic=policy.config.get("use_critic", True),
-    )
-
-    return batch
 
 
 class MyPPO(PPO):
     def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
         return MyPPOTorchPolicy
+
+    def reset_config(self, new_config: Dict):
+        return True
+        def reset_policy(worker:RolloutWorker):
+            print(worker.global_vars)
+
+        #self.workers.foreach_worker(reset_policy)
+        #from algo:
+        #   1- batch_size(train_batch_size)
+        #   2- ppo epochs(num_sgd_iter)
+        #   3- mini_batch_size(sgd_minibatch_size)
+        num_sgd_iter = int(new_config["num_sgd_iter"])
+        sgd_minibatch_size = int(new_config["sgd_minibatch_size"])
+
+
+        self.config["num_sgd_iter"] = num_sgd_iter
+        self.config["sgd_minibatch_size"] = sgd_minibatch_size
+
+        print(f"****FROM RESET CONFIG: {num_sgd_iter} {sgd_minibatch_size}")
+        return True 

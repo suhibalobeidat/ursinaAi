@@ -2,7 +2,7 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPOTorchPolicy,MyPPO
+from models import rlib_model,MyPPO
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from ray.rllib.evaluation.worker_set import WorkerSet
 from ray.rllib.policy.sample_batch import SampleBatch
@@ -11,8 +11,13 @@ import ray
 from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
 from gym.spaces import Box,Discrete,Dict
 from ray import tune
+from ray.air.config import RunConfig
+from ray.air import FailureConfig
 from call_backs import MyCallBacks
 from Teacher import get_args
+from ray.tune.logger import pretty_print
+from ray.tune.schedulers.pb2 import PB2
+from ray.rllib.algorithms.registry import POLICIES
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -39,7 +44,6 @@ parser.add_argument('--sageMaker', type=bool, default=False, help='number of par
 
 
 
-
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -47,6 +51,7 @@ if __name__ == '__main__':
 
     register_env("UrsinaGym", lambda config: UrsinaGym(config))
     ModelCatalog.register_custom_model("rlib_model", rlib_model)
+    tune.register_trainable("MyPPO",MyPPO)
 
     """ model_config = {
         "name":"rlib_model",
@@ -78,69 +83,76 @@ if __name__ == '__main__':
             "is_teacher":False,
             "teacher_args":teacher_args}
 
+    #config = PPOConfig(algo_class=PPO)
     config = PPOConfig(algo_class=MyPPO)
     config.env = "UrsinaGym"
-    config.env_config = env_config
+    #config.env_config = env_config
+    config.env_config.update(env_config)
     config.framework(framework="torch")
-    config.num_envs_per_worker = 3
-    config.num_workers = 2
+    config.num_envs_per_worker = 2
+    config.num_workers = 1
     config.remote_worker_envs = True  
-    config.num_gpus_per_worker = 1/config.num_workers 
+    config.num_gpus = 1/4           
+    config.num_gpus_per_worker = 1/8
+    config.num_cpus_per_worker = config.num_envs_per_worker
     config.remote_env_batch_wait_ms = 4
     config.disable_env_checking = False
     config.recreate_failed_workers= True
     config.restart_failed_sub_environments = True
-    config.train_batch_size = 4000
-    config.lr = 5e-5
-    config.model["vf_share_layers"] = False
+    config.train_batch_size = 1100#tune.uniform(0,1)#tune.qrandint(1000, 10000, 500)
+    config.lr = tune.loguniform(1e-5,1e-1)#tune.grid_search([0.01, 0.001, 0.0001,0.00001])
+    config.sgd_minibatch_size = tune.choice([128, 256, 512,1024])
+    config.num_sgd_iter = tune.randint(5,60)
+    config.clip_param = 0.3#tune.grid_search([0.1,0.2,0.3])
+    config.model["fcnet_hiddens"] = [256, 256]
+    config.model["fcnet_activation"] = "tanh"
+    config.model["vf_share_layers"] = False#tune.grid_search([True, False])
     config.model["custom_model"] = "rlib_model"
     config.model["custom_model_config"] = {"obs":args.text_input_length}
-    config.batch_mode = "complete_episodes"
+    config.batch_mode = "complete_episodes"#"complete_episodes"#"truncate_episodes"
     config.horizon = 100
-    config.log_level = "INFO"
+    config.log_level = "WARN"#"INFO"
     config.simple_optimizer = True
-    config.exploration()
-
+    config.create_env_on_local_worker = False
     
-    tune.register_trainable("MyPPO",MyPPO)
+    #resource_group = tune.PlacementGroupFactory([{"CPU": 2, "GPU": 0.25}])
+    #trainable_with_resources = tune.with_resources(MyPPO, resource_group)
 
-    tune.run("MyPPO",config=config.to_dict())  
+    pb2_scheduler = PB2(
+        time_attr="training_iteration",
+        metric='episode_reward_mean',
+        mode='max',
+        perturbation_interval=1,
+        synch=True,
+        hyperparam_bounds={"lr": [0.00001,0.001],
+                            "sgd_minibatch_size":[128,1024],
+                            "num_sgd_iter":[5,60]})
+
+    """ tune.run("MyPPO",scheduler=pb2_scheduler,num_samples=4,
+    fail_fast=True,verbose=3,reuse_actors=True,config=config.to_dict()) """
+    
+    tune.Tuner(
+    "MyPPO",
+    param_space=config.to_dict(),
+    tune_config=tune.TuneConfig(num_samples=5,scheduler=pb2_scheduler,reuse_actors=True),
+    run_config=RunConfig(failure_config=FailureConfig(fail_fast=True))
+    ).fit()  
+
+    #tune.run("MyPPO",config=config.to_dict())  
 
     """ config = PPOConfig().environment(env="CartPole-v0").training(train_batch_size=4000).framework(framework="torch")
 
     tune.run("PPO", config=config.to_dict()) """
-    #algo = config.build()
+
+    """ def ensaa(worker:RolloutWorker):
+        print(worker.global_vars)
+    algo = config.build()
+    algo.workers.foreach_worker(ensaa) """
+
+
+
+
     #algo.train()
 
     #policy = algo.get_policy()
     #print(policy.model.model)
-   
-    """ config = config.to_dict()
-    obs = Dict({
-            "obs": Box(-100., 100., shape=(34,)),
-            "action_mask": Box(0, 1, shape=(29,))
-        })
-    action = Discrete(29)
-    
-    policy = MyPPOTorchPolicy(obs,action,{"custom_model":"rlib_model",
-    "custom_model_config":{"obs":args.text_input_length}})
-    workers = WorkerSet(
-    policy_class=MyPPOTorchPolicy,
-    env_creator=lambda c: make_env(env_config),
-    num_workers=1,trainer_config=config) 
-
-    for i in range(1):
-    # Gather a batch of samples.
-        T1 = SampleBatch.concat_samples(
-            ray.get([w.sample.remote() for w in workers.remote_workers()]))
-
-        # Improve the policy using the T1 batch.
-        policy.learn_on_batch(T1)
-
-        # The local worker acts as a "parameter server" here.
-        # We put the weights of its `policy` into the Ray object store once (`ray.put`)...
-        weights = ray.put({"default_policy": policy.get_weights()})
-        for w in workers.remote_workers():
-            # ... so that we can broacast these weights to all rollout-workers once.
-            w.set_weights.remote(weights)   """ 
- 
