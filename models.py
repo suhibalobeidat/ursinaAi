@@ -20,7 +20,8 @@ from ray.rllib.algorithms.ppo.my_ppo_torch_policy import MyPPOTorchPolicy
 from ray.rllib.models.torch.torch_action_dist import TorchCategorical
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from utils_ursina import correct_value
-
+from ray.rllib.utils.typing import PartialAlgorithmConfigDict
+from utils import round_to_multiple
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -107,41 +108,8 @@ class rlib_model(TorchModelV2,nn.Module):
     def value_function(self):
         return self.model.value_function()
 
-class MyActionDist(TorchCategorical):
-    @staticmethod
-    def required_model_output_shape(action_space, model_config):
-        return 7  # controls model output feature vector size
-
-    def __init__(self, inputs, model):
-        super(MyActionDist, self).__init__(inputs, model)
-        assert model.num_outputs == 7
-
-    def sample(self): ...
-    def logp(self, actions): ...
-    def entropy(self): ...
-
-
 
 class MyPPO(PPO):
     def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
         return MyPPOTorchPolicy
 
-    def reset_config(self, new_config: Dict):
-        return True
-        def reset_policy(worker:RolloutWorker):
-            print(worker.global_vars)
-
-        #self.workers.foreach_worker(reset_policy)
-        #from algo:
-        #   1- batch_size(train_batch_size)
-        #   2- ppo epochs(num_sgd_iter)
-        #   3- mini_batch_size(sgd_minibatch_size)
-        num_sgd_iter = int(new_config["num_sgd_iter"])
-        sgd_minibatch_size = int(new_config["sgd_minibatch_size"])
-
-
-        self.config["num_sgd_iter"] = num_sgd_iter
-        self.config["sgd_minibatch_size"] = sgd_minibatch_size
-
-        print(f"****FROM RESET CONFIG: {num_sgd_iter} {sgd_minibatch_size}")
-        return True 

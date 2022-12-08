@@ -3,6 +3,7 @@ import h5py
 import torch
 import os.path
 import gym
+from math import ceil, floor
 
 def get_data_statistics(file_name):
     file = h5py.File(file_name, "r+")
@@ -65,3 +66,12 @@ def create_data_stat(dir,texts_mean,texts_std):
     file.close()
 
 
+def round_to_multiple(number, multiple, direction='nearest'):
+    if direction == 'nearest':
+        return multiple * round(number / multiple)
+    elif direction == 'up':
+        return multiple * ceil(number / multiple)
+    elif direction == 'down':
+        return multiple * floor(number / multiple)
+    else:
+        return multiple * round(number / multiple)
