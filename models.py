@@ -22,6 +22,8 @@ from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from utils_ursina import correct_value
 from ray.rllib.utils.typing import PartialAlgorithmConfigDict
 from utils import round_to_multiple
+from ray.tune import Stopper
+
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -113,3 +115,17 @@ class MyPPO(PPO):
     def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
         return MyPPOTorchPolicy
 
+
+
+class CustomStopper(Stopper):
+
+    def __call__(self, trial_id, result):
+        total_loss = result["info"]["learner"]["default_policy"]["learner_stats"]["total_loss"]
+        if total_loss > 20:
+            return True
+        else:
+            return False
+
+    def stop_all(self):
+        """Returns whether to stop trials and prevent new ones from starting."""
+        return False

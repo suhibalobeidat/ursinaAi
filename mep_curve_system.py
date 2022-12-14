@@ -353,13 +353,13 @@ class System():
 
     def get_reward(self,is_new_room):
         if self.is_collide:
-            reward = -100
+            reward = -1
         else:
-            distance = vec_len(self.relative_direction_to_goal)
+            #distance = vec_len(self.relative_direction_to_goal)
             if is_new_room:
-                reward = 10
+                reward = 1
             else:
-                reward = self.get_distance_reward(distance)
+                reward = 0#self.get_distance_reward(distance)
 
                 """ if self.current_angle != 0:
                     reward = -2#reward/2
