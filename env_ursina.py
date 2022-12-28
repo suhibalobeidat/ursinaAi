@@ -45,7 +45,7 @@ class Navigation_env():
 
 
     def reset(self, goal):
-        distance = correct_value(goal[0],0,1,self.min_distance,self.max_distance)
+        #distance = correct_value(goal[0],0,1,self.min_distance,self.max_distance)
         
         #goal_point = get_point_at_distance(distance)
 
@@ -55,7 +55,7 @@ class Navigation_env():
         self.system.reset()
         self.layout.reset()
 
-        self.layout.generate_layout(self.system.system_segmants[-1])
+        self.layout.generate_layout(self.system.system_segmants[-1],goal[3])
         self.layout.get_path_rects()
 
         #goal_point = self.layout.get_goal_point(distance)
@@ -97,7 +97,7 @@ class Navigation_env():
         if self.system.check_for_collision():
             self.system.is_done = 1
             self.done = True
-        elif self.system.is_successful():
+        elif self.system.is_successful(is_new_room):
             self.system.is_done = 3
             self.done = True
         elif self.system.max_iteration_exceeded() or self.layout.is_last_room: 

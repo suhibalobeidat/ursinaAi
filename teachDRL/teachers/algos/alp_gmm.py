@@ -60,7 +60,7 @@ class ALPGMM():
         # Number of Expectation-Maximization trials when fitting
         self.nb_em_init = 1 if "nb_em_init" not in params else params['nb_em_init']
         # Number of episodes between two fit of the GMM
-        self.fit_rate = 50 if "fit_rate" not in params else params['fit_rate']
+        self.fit_rate = 250 if "fit_rate" not in params else params['fit_rate']
         self.nb_random = self.fit_rate  # Number of bootstrapping episodes
 
         # Ratio of randomly sampled tasks VS tasks sampling using GMM
@@ -71,7 +71,7 @@ class ALPGMM():
 
         # Maximal number of episodes to account for when computing ALP
         alp_max_size = None if "alp_max_size" not in params else params["alp_max_size"]
-        alp_buffer_size = 50 if "alp_buffer_size" not in params else params["alp_buffer_size"]
+        alp_buffer_size = 250 if "alp_buffer_size" not in params else params["alp_buffer_size"]
 
         # Init ALP computer
         self.alp_computer = EmpiricalALPComputer(len(mins), max_size=alp_max_size, buffer_size=alp_buffer_size)

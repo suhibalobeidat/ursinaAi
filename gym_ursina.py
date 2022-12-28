@@ -5,7 +5,7 @@ from env_ursina import env_interface
 import random
 from Teacher import get_teacher
 from gym.wrappers.normalize import NormalizeReward, NormalizeObservation
-
+import ray
 class InnerEnv(gym.Env):
     def __init__(self,env_config):
 
@@ -22,7 +22,7 @@ class InnerEnv(gym.Env):
         self.is_teacher = is_teacher
 
         if self.is_teacher:
-            self.teacher = get_teacher(env_config["teacher_args"])
+            self.teacher = ray.get_actor("teacher")#get_teacher(env_config["teacher_args"])
 
         self.env = env_interface(min_size,max_size,same_process=True)
         self.env.init()
@@ -31,10 +31,11 @@ class InnerEnv(gym.Env):
     def reset(self,**kwargs):
 
         if self.is_teacher:
-            self.params = self.teacher.get_env_params()
+            self.params = ray.get(self.teacher.get_env_params.remote())
             self.teacher_ret = 0
+            self.steps = 0
         else:
-            self.params = np.array([random.random() for i in range(2)])
+            self.params = np.array([random.random() for i in range(3)])
 
         receivedData = self.env.reset(self.params)
         observation = np.array(receivedData[:len(receivedData)-self.mask_size],dtype=np.float32)
@@ -66,9 +67,11 @@ class InnerEnv(gym.Env):
             truncated = False
 
         if self.is_teacher:
-            self.teacher_ret += 0.99 * reward
+            gamma = pow(0.99,self.steps)
+            self.teacher_ret += gamma * reward
+            self.steps +=1
             if terminated or truncated:
-                self.teacher.record_train_episode(self.teacher_ret, 0,self.params)
+                self.teacher.record_train_episode.remote(self.teacher_ret, 0,self.params)
 
         info = {"truncated":truncated,"action_mask":action_mask}
 

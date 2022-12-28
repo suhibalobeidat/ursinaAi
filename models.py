@@ -23,6 +23,8 @@ from utils_ursina import correct_value
 from ray.rllib.utils.typing import PartialAlgorithmConfigDict
 from utils import round_to_multiple
 from ray.tune import Stopper
+import ray
+from Teacher import get_teacher
 
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
@@ -129,3 +131,14 @@ class CustomStopper(Stopper):
     def stop_all(self):
         """Returns whether to stop trials and prevent new ones from starting."""
         return False
+
+@ray.remote(num_cpus=1)
+class Teacher:
+    def __init__(self,args):
+        self.teacher = get_teacher(args) 
+
+    def record_train_episode(self, reward, ep_len, env_params):
+        self.teacher.record_train_episode(reward,ep_len,env_params)
+
+    def get_env_params(self):
+        return self.teacher.get_env_params()

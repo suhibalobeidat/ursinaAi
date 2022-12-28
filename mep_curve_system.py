@@ -62,8 +62,12 @@ class System():
         
         return False
 
-    def is_successful(self):
-        return False
+    def is_successful(self,is_new_room):
+        if is_new_room:
+            return True
+        else:
+            return False
+                
         distance = vec_len(self.relative_direction_to_goal)
         if distance < self.max_distance_to_goal:
             return True
@@ -353,13 +357,13 @@ class System():
 
     def get_reward(self,is_new_room):
         if self.is_collide:
-            reward = -1
+            reward = -100
         else:
             #distance = vec_len(self.relative_direction_to_goal)
             if is_new_room:
-                reward = 1
+                reward = 100
             else:
-                reward = 0#self.get_distance_reward(distance)
+                reward = -1#self.get_distance_reward(distance)
 
                 """ if self.current_angle != 0:
                     reward = -2#reward/2

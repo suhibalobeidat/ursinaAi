@@ -48,7 +48,7 @@ class Layout():
 
 
     def is_inside_last_room(self,segmant):
-        if self.rooms[3].is_inside(segmant.position):
+        if self.rooms[self.max_rooms_number-2].is_inside(segmant.position):
             return True
     
         return False
@@ -90,8 +90,9 @@ class Layout():
 
 
 
-    def generate_layout(self, mep_curve_segmant):
+    def generate_layout(self, mep_curve_segmant,opening_size):
         self.mep_curve_segmant = mep_curve_segmant
+        self.opening_size = opening_size
 
         #print(f"segmant width {self.mep_curve_segmant.width} , segmant height {self.mep_curve_segmant.height}, max_elbow_length {self.mep_curve_segmant.max_elbow_length}")
         for i in range(self.max_rooms_number):
@@ -170,8 +171,8 @@ class Layout():
     def get_opening_size(self,wall):
         #return 5,5
         dim = max(self.mep_curve_segmant.width,self.mep_curve_segmant.height)
-        width = random.randint(int(dim)+1,wall.width-1)
-        height = random.randint(int(dim)+1,wall.height-1)
+        width = correct_value(self.opening_size,0,1,int(dim)+1,wall.width-1)#random.randint(int(dim)+1,wall.width-1)
+        height = correct_value(self.opening_size,0,1,int(dim)+1,wall.height-1)#random.randint(int(dim)+1,wall.height-1)
         return width,height
 
     def get_room_size(self):
