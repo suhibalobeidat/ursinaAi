@@ -25,7 +25,10 @@ from utils import round_to_multiple
 from ray.tune import Stopper
 import ray
 from Teacher import get_teacher
-
+from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
+from ray.rllib.utils.typing import EnvType
+from typing import Callable
+from ray.tune.logger import Logger
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -113,9 +116,11 @@ class rlib_model(TorchModelV2,nn.Module):
         return self.model.value_function()
 
 
+
+
 class MyPPO(PPO):
     def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
-        return MyPPOTorchPolicy
+        return MyPPOTorchPolicy 
 
 
 

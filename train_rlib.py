@@ -2,7 +2,7 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPO,CustomStopper
+from models import rlib_model,MyPPO,CustomStopper,Teacher
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from ray.rllib.evaluation.worker_set import WorkerSet
 from ray.rllib.policy.sample_batch import SampleBatch
@@ -58,19 +58,23 @@ parser.add_argument('--envs_per_worker', type=int, default=2, help='number of pa
 parser.add_argument('--sageMaker', type=bool, default=False, help='number of parallel agents')
 
 class Trainable(tune.Trainable):
-    def setup(self, config):
+    def setup(self, config,teacher_args=None):
+
+        fcnet_activation = 0.1823053454576449,
+        fcnet_hiddens_layer_count= 2.0,
+        layer_width= 738.0168809379319,
 
     
         lr = float(config["lr"])
-        grad_clip = float(config["grad_clip"])
+        #grad_clip = float(config["grad_clip"])
         num_sgd_iter = float(config["num_sgd_iter"])
         sgd_minibatch_size = float(config["sgd_minibatch_size"])
         clip_param = float(config["clip_param"])
-        #vf_loss_coeff = float(config["vf_loss_coeff"])
+        vf_loss_coeff = float(config["vf_loss_coeff"])
         entropy_coeff = float(config["entropy_coeff"])
-        fcnet_hiddens_layer_count = float(config["fcnet_hiddens_layer_count"])
-        layer_width = float(config["layer_width"])
-        fcnet_activation = float(config["fcnet_activation"])
+        #fcnet_hiddens_layer_count = float(config["fcnet_hiddens_layer_count"])
+        #layer_width = float(config["layer_width"])
+        #fcnet_activation = float(config["fcnet_activation"])
         train_batch_size = float(config["train_batch_size"])
         
 
@@ -99,7 +103,7 @@ class Trainable(tune.Trainable):
                 "min_size":75,
                 "max_size":250,
                 "is_teacher":False,
-                "teacher_args":None}
+                "teacher_args":teacher_args}
 
         config = PPOConfig(algo_class=MyPPO)
         config.framework(framework="torch")
@@ -108,31 +112,30 @@ class Trainable(tune.Trainable):
         config.recreate_failed_workers= True
         config.restart_failed_sub_environments = True
         config.env_config.update(env_config)
-        config.num_envs_per_worker = 2
-        config.num_workers = 1
+        config.num_envs_per_worker = 5
+        config.num_workers = 2
         config.remote_worker_envs = True  
-        config.num_gpus = 1/4           
-        config.num_gpus_per_worker = 0.083 
+        config.num_gpus = 0.5          
+        config.num_gpus_per_worker = 0.25 
         config.num_cpus_per_worker = config.num_envs_per_worker
         config.remote_env_batch_wait_ms = 4
         config.train_batch_size = train_batch_size
         config.lr = lr
         config.vf_clip_param = 10
-        config.grad_clip = grad_clip
+        config.grad_clip = 0.5
         config.clip_param = clip_param
         config.sgd_minibatch_size = sgd_minibatch_size
         config.num_sgd_iter = num_sgd_iter
         config.model["fcnet_hiddens"] = hidden_layers
         config.model["fcnet_activation"] = fcnet_activation
         config.model["vf_share_layers"] = False
-        #config.vf_loss_coeff = vf_loss_coeff
+        config.vf_loss_coeff = vf_loss_coeff
         config.entropy_coeff = entropy_coeff
         config.model["custom_model"] = "rlib_model"
         config.model["custom_model_config"] = {"obs":args.text_input_length}
         config.batch_mode = "complete_episodes"
         config.horizon = 100
         config.log_level = "WARN"#"INFO"
-        config.simple_optimizer = True
         config.create_env_on_local_worker = True
         if config.create_env_on_local_worker:
             config.num_cpus_for_local_worker = config.num_envs_per_worker
@@ -149,7 +152,6 @@ class Trainable(tune.Trainable):
         return self.algo.load_checkpoint(checkpoint)
 
 
-
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -160,7 +162,10 @@ if __name__ == '__main__':
 
     teacher_args = get_args()
 
-    config = {"lr":tune.uniform(1e-6,4e-3),
+    #teacher = Teacher.options(name="teacher").remote(teacher_args)
+
+
+    """ config = {"lr":tune.uniform(1e-6,4e-3),
             "num_sgd_iter":tune.uniform(5,30),
             "sgd_minibatch_size":tune.uniform(65,10000),
             "clip_param":tune.uniform(0.01,0.3),
@@ -172,45 +177,106 @@ if __name__ == '__main__':
             "train_batch_size":tune.uniform(1025,10000),
             "grad_clip":tune.uniform(0.1,1)
 
+            } """
+
+    config = {
+            "clip_param": 0.01,
+            "entropy_coeff": 0.001,
+            "lr": 0.00015586661343287977,
+            "num_sgd_iter": tune.choice([12, 14, 16]),
+            "sgd_minibatch_size": tune.choice([5000, 6000, 7000]),
+            "train_batch_size": tune.choice([7000, 8000, 9000]),
+            "vf_loss_coeff": tune.choice([0.05, 0.1, 0.2])
             }
 
-
-    """ trainable_with_resources  = tune.with_resources(
-        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
-            {"CPU": 1, "GPU": 0.25},
-            {"CPU": 4, "GPU": 0.083}
-        ])) """
     trainable_with_resources  = tune.with_resources(
+        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
+            {"CPU": 5, "GPU": 0.5},
+            {"CPU": 5, "GPU": 0.25},
+            {"CPU": 5, "GPU": 0.25},
+
+        ])) 
+    """ trainable_with_resources  = tune.with_resources(
         Trainable,tune.PlacementGroupFactory([
             {"CPU": 2, "GPU": 0.25},
             {"CPU":2, "GPU": 0.083}
-        ]))
+        ])) """
 
     stopper = CustomStopper()
 
-    
-
-    result = tune.run(
-        run_or_experiment=trainable_with_resources,
-        config=config,
-        mode="max", 
-        metric="episode_reward_mean",
-        search_alg=BayesOptSearch(
+    """ search_alg=BayesOptSearch(
             random_search_steps=10
-            ),
-        scheduler=AsyncHyperBandScheduler(
+            )
+
+    scheduler=AsyncHyperBandScheduler(
             time_attr="timesteps_total",
             grace_period=200000,
             max_t=1000000
-            ),
-        num_samples=30,
-        max_concurrent_trials=3,
+            ) """
+
+    pbt = PB2(
+        time_attr="timesteps_total",
+        perturbation_interval=50000,
+        synch=True,
+        hyperparam_bounds={
+            "num_sgd_iter": [5,30],
+            "sgd_minibatch_size": [65,10000],
+            "train_batch_size": [1025,10000],
+            "clip_param":[0.01,0.3],
+            "lr":[1e-6,1e-4],
+            "entropy_coeff":[0.001,0.1],
+            "vf_loss_coeff":[0.01,0.9]
+        }
+    )
+
+
+    name="Trainable_2022-12-28_20-26-00"
+    
+
+    """ 
+    result = tune.run(
+        run_or_experiment=trainable_with_resources,
+        config=config,
+        reuse_actors=True,
+        mode="max", 
+        metric="episode_reward_mean",
+        search_alg=None,
+        scheduler=pbt,
+        num_samples=4,
+        max_concurrent_trials=4,
         max_failures=5,
         verbose=3,
         stop=stopper,
         resume=True,
         checkpoint_at_end=True,
-        log_to_file=False,
+        log_to_file=True,
         local_dir=r"C:\Users\sohai\ray_results",
-        name="Trainable_2022-12-19_13-45-06")  
+        checkpoint_freq=1,
+        name = name
+        )   
+    """
  
+    tuner = tune.Tuner(
+        trainable_with_resources,
+        param_space=config,
+        tune_config=tune.TuneConfig(
+            mode="max",
+            metric="episode_reward_mean",
+            scheduler=pbt,
+            num_samples=4,
+            max_concurrent_trials=1    
+        ),
+        run_config=RunConfig(
+            verbose=3,
+            stop=stopper,
+            failure_config=FailureConfig(
+                fail_fast=True),
+            checkpoint_config=CheckpointConfig(
+                checkpoint_at_end=True,
+                checkpoint_frequency=10,
+                num_to_keep=2,
+                checkpoint_score_attribute="episode_reward_mean")
+        ),
+
+    )
+    results = tuner.fit()
