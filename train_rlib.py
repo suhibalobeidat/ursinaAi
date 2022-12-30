@@ -1,38 +1,20 @@
 from ray.tune.registry import register_env
-from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPO,CustomStopper,Teacher
-from ray.rllib.evaluation.rollout_worker import RolloutWorker
-from ray.rllib.evaluation.worker_set import WorkerSet
-from ray.rllib.policy.sample_batch import SampleBatch
+from models import rlib_model,MyPPO,CustomStopper
 from gym_ursina import UrsinaGym
-import ray
-from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
-from gym.spaces import Box,Discrete,Dict
+from ray.rllib.algorithms.ppo.ppo import PPOConfig
+from gym.spaces import Dict
 from ray import tune
-from ray.air.config import RunConfig,CheckpointConfig
+from ray.air.config import RunConfig
 from ray.air import FailureConfig
-from call_backs import MyCallBacks
 from Teacher import get_args
-from ray.tune.logger import pretty_print
 from ray.tune.schedulers.pb2 import PB2
 from ray.rllib.algorithms.registry import POLICIES
-from ray.tune.schedulers import AsyncHyperBandScheduler
-from ray.tune.search.bayesopt import BayesOptSearch
-from ray.tune.search.hyperopt import HyperOptSearch
 from utils import round_to_multiple
-from ray.air import session
-from ray.air.checkpoint import Checkpoint
-from ray.tune.utils import wait_for_gpu,validate_save_restore
-from ray.air.checkpoint import Checkpoint
+
 from typing import Any, Callable, Dict, List, Optional, Union, TYPE_CHECKING
 
-import ray.tune.search.sample
-
-import os
-
-#os.environ["TUNE_DISABLE_SIGINT_HANDLER"] = "1"
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -60,9 +42,9 @@ parser.add_argument('--sageMaker', type=bool, default=False, help='number of par
 class Trainable(tune.Trainable):
     def setup(self, config,teacher_args=None):
 
-        fcnet_activation = 0.1823053454576449,
-        fcnet_hiddens_layer_count= 2.0,
-        layer_width= 738.0168809379319,
+        fcnet_activation = 0.1823053454576449
+        fcnet_hiddens_layer_count= 2.0
+        layer_width= 738.0168809379319
 
     
         lr = float(config["lr"])
@@ -112,10 +94,10 @@ class Trainable(tune.Trainable):
         config.recreate_failed_workers= True
         config.restart_failed_sub_environments = True
         config.env_config.update(env_config)
-        config.num_envs_per_worker = 5
-        config.num_workers = 2
+        config.num_envs_per_worker = 3
+        config.num_workers = 1
         config.remote_worker_envs = True  
-        config.num_gpus = 0.5          
+        config.num_gpus = 0.25         
         config.num_gpus_per_worker = 0.25 
         config.num_cpus_per_worker = config.num_envs_per_worker
         config.remote_env_batch_wait_ms = 4
@@ -139,6 +121,7 @@ class Trainable(tune.Trainable):
         config.create_env_on_local_worker = True
         if config.create_env_on_local_worker:
             config.num_cpus_for_local_worker = config.num_envs_per_worker
+        config.evaluation_interval = None
 
         self.algo = config.build()
 
@@ -150,6 +133,9 @@ class Trainable(tune.Trainable):
     
     def load_checkpoint(self, checkpoint: Union[Dict, str]):
         return self.algo.load_checkpoint(checkpoint)
+
+    def reset_config(self, new_config: Dict):
+        return True
 
 
 if __name__ == '__main__':
@@ -189,18 +175,18 @@ if __name__ == '__main__':
             "vf_loss_coeff": tune.choice([0.05, 0.1, 0.2])
             }
 
-    trainable_with_resources  = tune.with_resources(
-        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
-            {"CPU": 5, "GPU": 0.5},
-            {"CPU": 5, "GPU": 0.25},
-            {"CPU": 5, "GPU": 0.25},
-
-        ])) 
     """ trainable_with_resources  = tune.with_resources(
+        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
+            {"CPU": 3, "GPU": 0.25},
+            {"CPU": 3, "GPU": 0.25},
+
+
+        ]))  """
+    trainable_with_resources  = tune.with_resources(
         Trainable,tune.PlacementGroupFactory([
-            {"CPU": 2, "GPU": 0.25},
-            {"CPU":2, "GPU": 0.083}
-        ])) """
+            {"CPU": 3, "GPU": 0.25},
+            {"CPU": 3, "GPU": 0.25},
+        ])) 
 
     stopper = CustomStopper()
 
@@ -216,7 +202,7 @@ if __name__ == '__main__':
 
     pbt = PB2(
         time_attr="timesteps_total",
-        perturbation_interval=50000,
+        perturbation_interval=10000,
         synch=True,
         hyperparam_bounds={
             "num_sgd_iter": [5,30],
@@ -228,34 +214,8 @@ if __name__ == '__main__':
             "vf_loss_coeff":[0.01,0.9]
         }
     )
-
-
-    name="Trainable_2022-12-28_20-26-00"
     
 
-    """ 
-    result = tune.run(
-        run_or_experiment=trainable_with_resources,
-        config=config,
-        reuse_actors=True,
-        mode="max", 
-        metric="episode_reward_mean",
-        search_alg=None,
-        scheduler=pbt,
-        num_samples=4,
-        max_concurrent_trials=4,
-        max_failures=5,
-        verbose=3,
-        stop=stopper,
-        resume=True,
-        checkpoint_at_end=True,
-        log_to_file=True,
-        local_dir=r"C:\Users\sohai\ray_results",
-        checkpoint_freq=1,
-        name = name
-        )   
-    """
- 
     tuner = tune.Tuner(
         trainable_with_resources,
         param_space=config,
@@ -264,19 +224,17 @@ if __name__ == '__main__':
             metric="episode_reward_mean",
             scheduler=pbt,
             num_samples=4,
-            max_concurrent_trials=1    
+            reuse_actors=True
         ),
         run_config=RunConfig(
             verbose=3,
             stop=stopper,
             failure_config=FailureConfig(
                 fail_fast=True),
-            checkpoint_config=CheckpointConfig(
-                checkpoint_at_end=True,
-                checkpoint_frequency=10,
-                num_to_keep=2,
-                checkpoint_score_attribute="episode_reward_mean")
+
         ),
 
     )
+
+    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2022-12-29_18-53-12")
     results = tuner.fit()
