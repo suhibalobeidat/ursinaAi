@@ -135,6 +135,20 @@ class Trainable(tune.Trainable):
         return self.algo.load_checkpoint(checkpoint)
 
     def reset_config(self, new_config: Dict):
+        train_batch_size = float(new_config["train_batch_size"])
+        sgd_minibatch_size = float(new_config["sgd_minibatch_size"])
+        num_sgd_iter = float(new_config["num_sgd_iter"])
+
+
+        train_batch_size = round_to_multiple(train_batch_size,1000,"up")
+        sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,128,"up")
+        num_sgd_iter = int(num_sgd_iter)
+
+
+        self.algo.config["train_batch_size"] = train_batch_size
+        self.algo.config["sgd_minibatch_size"] = sgd_minibatch_size
+        self.algo.config["num_sgd_iter"] = num_sgd_iter
+
         return True
 
 
