@@ -254,6 +254,7 @@ class statManager:
         self.rews_stat = NormalizeReward()
 
     def update_mean_var(self,obs,rews):
+
         self.obs_stat.normalize(obs)
         self.rews_stat.normalize(rews)
 
@@ -314,7 +315,7 @@ class NormalizeReward():
 
 
     def normalize(self, rews):
-        self.returns = 0.0
+        self.returns = np.zeros(1)
         for i in range(len(rews)):
             self.returns = self.returns * self.gamma + rews[i]
             self.return_rms.update(self.returns)

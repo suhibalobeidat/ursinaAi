@@ -101,13 +101,17 @@ class UrsinaGym(gym.Env):
         self.obs = []
         self.rews = []
 
-        self.obs_mean = np.zeros((34,), "float64")
-        self.obs_var =  np.ones((34,), "float64")
+        self.obs_mean = np.zeros((obs_size,), "float64")
+        self.obs_var =  np.ones((obs_size,), "float64")
+        self.ret_var = np.ones((), "float64")
 
-        self.ret_var = np.ones((1,), "float64")
+        self.epsilon=1e-4
 
     def reset(self):      
+        self.obs = []
+        self.rews = []
         obs,info = self.inner_env.reset(return_info=True)
+
         self.obs.append(obs)
 
         obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
@@ -119,15 +123,16 @@ class UrsinaGym(gym.Env):
 
     def step(self, action):
         obs, reward, terminated, info =  self.inner_env.step(action)
+        
 
+        self.obs.append(obs)
+        self.rews.append(reward)
+        
         if terminated:
-            self.obs.append(obs)
-            self.rews.append(reward)
-            self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(self.obs, 0,self.rews))
-            self.obs = []
-            self.rews = []
+            self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(np.stack(self.obs),self.rews))
 
         obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
+
         reward = reward / np.sqrt(self.ret_var + self.epsilon)
 
         observation = {"obs":obs,"action_mask":info["action_mask"]}
