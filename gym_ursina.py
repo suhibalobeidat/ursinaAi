@@ -91,20 +91,47 @@ class UrsinaGym(gym.Env):
         })
         self.action_space = spaces.Discrete(mask_size)
 
+        self.statManager = ray.get_actor("statManager")
+
         env = InnerEnv(env_config)
-        env = NormalizeObservation(env)
-        env = NormalizeReward(env)
+        #env = NormalizeObservation(env)
+        #env = NormalizeReward(env)
         self.inner_env = env
+
+        self.obs = []
+        self.rews = []
+
+        self.obs_mean = np.zeros((34,), "float64")
+        self.obs_var =  np.ones((34,), "float64")
+
+        self.ret_var = np.ones((1,), "float64")
 
     def reset(self):      
         obs,info = self.inner_env.reset(return_info=True)
+        self.obs.append(obs)
+
+        obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
+
         observation = {"obs":obs,"action_mask":info["action_mask"]}
+
 
         return observation
 
     def step(self, action):
         obs, reward, terminated, info =  self.inner_env.step(action)
+
+        if terminated:
+            self.obs.append(obs)
+            self.rews.append(reward)
+            self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(self.obs, 0,self.rews))
+            self.obs = []
+            self.rews = []
+
+        obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
+        reward = reward / np.sqrt(self.ret_var + self.epsilon)
+
         observation = {"obs":obs,"action_mask":info["action_mask"]}
+
         return observation, reward, terminated, info
 
 

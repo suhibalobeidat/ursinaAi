@@ -29,6 +29,13 @@ from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
 from ray.rllib.utils.typing import EnvType
 from typing import Callable
 from ray.tune.logger import Logger
+from ray.rllib.models.torch.recurrent_net import RecurrentNetwork as TorchRNN
+from ray.rllib.utils.annotations import override
+from ray.rllib.models.modelv2 import ModelV2
+from ray.rllib.policy.rnn_sequencing import add_time_dimension
+from gym.wrappers.normalize import RunningMeanStd
+import h5py
+
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -107,7 +114,8 @@ class rlib_model(TorchModelV2,nn.Module):
         logits,state = self.model.forward(input_dict, state, seq_lens)
   
         inf_mask = torch.clamp(torch.log(action_mask), min=FLOAT_MIN)
-        masked_logits = logits + inf_mask
+
+        masked_logits = logits #+ inf_mask
 
         return masked_logits,state
 
@@ -115,7 +123,98 @@ class rlib_model(TorchModelV2,nn.Module):
     def value_function(self):
         return self.model.value_function()
 
+class rlib_model_lstm(TorchRNN,nn.Module):
+    def __init__(self,
+                 obs_space,
+                 action_space,
+                 num_outputs,
+                 model_config,
+                 name):
 
+        TorchRNN.__init__(self,obs_space, action_space, num_outputs, model_config, name)
+        nn.Module.__init__(self)
+
+        self.obs_size = model_config["custom_model_config"]["obs"]
+        self.fc_size = model_config["custom_model_config"]["fc_size"]
+        self.lstm_state_size = model_config["custom_model_config"]["lstm_state_size"]
+        
+        obs_space = spaces.Box(-100,100,shape=(self.obs_size,))
+
+        self.model = FullyConnectedNetwork(
+            obs_space, action_space, 0, model_config, name
+        )
+
+        self.lstm = nn.LSTM(self.fc_size, self.lstm_state_size, batch_first=True)
+
+        self.action_layer = nn.Linear(self.lstm_state_size,num_outputs,True)
+
+    @override(ModelV2)
+    def get_initial_state(self):
+        # TODO: (sven): Get rid of `get_initial_state` once Trajectory
+        #  View API is supported across all of RLlib.
+        # Place hidden states on same device as model.
+        h = [
+            #torch.zeros(self.num_recurrent_layers, batch_size, self.recurrent_hidden_size).to(device)
+            self.model._hidden_layers[0]._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
+            self.model._hidden_layers[0]._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
+        ]
+        return h
+
+    def forward(self, input_dict, state, seq_lens):
+        """Adds time dimension to batch before sending inputs to forward_rnn().
+        You should implement forward_rnn() in your subclass."""
+        obs = input_dict["obs"]["obs"]
+        action_mask = input_dict["obs"]["action_mask"]
+        input_dict["obs_flat"] = obs
+
+        # Note that max_seq_len != input_dict.max_seq_len != seq_lens.max()
+        # as input_dict may have extra zero-padding beyond seq_lens.max().
+        # Use add_time_dimension to handle this
+
+
+        logits,state = self.model.forward(input_dict, state, seq_lens)
+
+        self.time_major = self.model_config.get("_time_major", False)
+        inputs = add_time_dimension(
+            logits,
+            seq_lens=seq_lens,
+            framework="torch",
+            time_major=self.time_major,
+        )
+
+
+        output, new_state = self.forward_rnn(inputs, state, seq_lens)
+        
+        output = torch.reshape(output, [-1, self.lstm_state_size])
+
+        self._features = torch.tanh(output)
+
+        self.model._features = self._features
+        action_logits = self.action_layer(self._features)
+
+        inf_mask = torch.clamp(torch.log(action_mask), min=FLOAT_MIN)
+
+        masked_output = action_logits + inf_mask
+
+        return masked_output, new_state
+
+
+    def forward_rnn(self, inputs, state, seq_lens):
+        """Feeds `inputs` (B x T x ..) through the Gru Unit.
+        Returns the resulting outputs as a sequence (B x T x ...).
+        Values are stored in self._cur_value in simple (B) shape (where B
+        contains both the B and T dims!).
+        Returns:
+            NN Outputs (B x T x ...) as sequence.
+            The state batches as a List of two items (c- and h-states).
+        """
+        output, [h, c] = self.lstm(
+            inputs, [torch.unsqueeze(state[0], 0), torch.unsqueeze(state[1], 0)]
+        )
+        return output, [torch.squeeze(h, 0), torch.squeeze(c, 0)]
+
+    def value_function(self):
+        return self.model.value_function()
 
 
 class MyPPO(PPO):
@@ -147,3 +246,75 @@ class Teacher:
 
     def get_env_params(self):
         return self.teacher.get_env_params()
+
+@ray.remote(num_cpus=1)
+class statManager:
+    def __init__(self,obs_shape=()):
+        self.obs_stat = NormalizeObservation(obs_shape)
+        self.rews_stat = NormalizeReward()
+
+    def update_mean_var(self,obs,rews):
+        self.obs_stat.normalize(obs)
+        self.rews_stat.normalize(rews)
+
+        return self.get_mean_var()
+
+    def get_mean_var(self):
+        return self.obs_stat.obs_rms.mean,self.obs_stat.obs_rms.var,self.rews_stat.return_rms.mean,self.rews_stat.return_rms.var
+
+
+    def save_stat(self):
+
+        file = h5py.File("data_stat.h5", "w")
+
+        file.create_dataset(
+                "obs_mean", np.shape(self.obs_stat.obs_rms.mean), data=self.obs_stat.obs_rms.mean
+            )
+        file.create_dataset(
+                "obs_var", np.shape(self.obs_stat.obs_rms.var), data=self.obs_stat.obs_rms.var
+            )
+        file.create_dataset(
+                "ret_mean", np.shape(self.rews_stat.return_rms.mean), data=self.rews_stat.return_rms.mean
+            )
+        file.create_dataset(
+                "ret_var", np.shape(self.rews_stat.return_rms.var), data=self.rews_stat.return_rms.var
+            )
+
+        file.create_dataset(
+                "count", np.shape(self.obs_stat.obs_rms.count), data=self.obs_stat.obs_rms.count
+            )
+
+        file.close()
+
+class NormalizeObservation():
+    def __init__(
+        self,
+        shape,
+        epsilon=1e-8):
+
+        self.obs_rms = RunningMeanStd(shape=shape)
+        self.epsilon = epsilon
+
+
+    def normalize(self, obs):
+        self.obs_rms.update(obs)
+        return (obs - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + self.epsilon)
+
+
+class NormalizeReward():
+    def __init__(
+        self,
+        gamma=0.99,
+        epsilon=1e-8):
+
+        self.return_rms = RunningMeanStd(shape=())
+        self.returns = np.zeros(1)
+        self.gamma = gamma
+        self.epsilon = epsilon
+
+
+    def normalize(self, rews):
+        self.returns = 0.0
+        for i in range(len(rews)):
+            self.returns = self.returns * self.gamma + rews[i]
+            self.return_rms.update(self.returns)

@@ -145,11 +145,18 @@ class Trainable(tune.Trainable):
         num_sgd_iter = int(num_sgd_iter)
 
 
+
+
         self.algo.config["train_batch_size"] = train_batch_size
         self.algo.config["sgd_minibatch_size"] = sgd_minibatch_size
         self.algo.config["num_sgd_iter"] = num_sgd_iter
 
+        update_params = lambda policy,policyId: policy.update_params(new_config)
+
+        self.algo.workers.foreach_policy_to_train(update_params)
+
         return True
+
 
 
 if __name__ == '__main__':
@@ -180,13 +187,13 @@ if __name__ == '__main__':
             } """
 
     config = {
-            "clip_param": 0.01,
-            "entropy_coeff": 0.001,
-            "lr": 0.00015586661343287977,
+            "clip_param": tune.choice([0.001, 0.01, 0.05]),
+            "entropy_coeff": tune.choice([0.0001, 0.001, 0.005]),
+            "lr": tune.choice([9e-5, 0.00015586661343287977, 4e-4]),
             "num_sgd_iter": tune.choice([12, 14, 16]),
             "sgd_minibatch_size": tune.choice([5000, 6000, 7000]),
             "train_batch_size": tune.choice([7000, 8000, 9000]),
-            "vf_loss_coeff": tune.choice([0.05, 0.1, 0.2])
+            "vf_loss_coeff": tune.choice([0.001, 0.1, 0.2])
             }
 
     """ trainable_with_resources  = tune.with_resources(
@@ -216,16 +223,16 @@ if __name__ == '__main__':
 
     pbt = PB2(
         time_attr="timesteps_total",
-        perturbation_interval=10000,
+        perturbation_interval=50000,
         synch=True,
         hyperparam_bounds={
             "num_sgd_iter": [5,30],
             "sgd_minibatch_size": [65,10000],
             "train_batch_size": [1025,10000],
-            "clip_param":[0.01,0.3],
+            "clip_param":[0.001,0.3],
             "lr":[1e-6,1e-4],
-            "entropy_coeff":[0.001,0.1],
-            "vf_loss_coeff":[0.01,0.9]
+            "entropy_coeff":[0.0001,0.1],
+            "vf_loss_coeff":[0.001,0.9]
         }
     )
     
