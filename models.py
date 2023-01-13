@@ -35,7 +35,7 @@ from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.policy.rnn_sequencing import add_time_dimension
 from gym.wrappers.normalize import RunningMeanStd
 import h5py
-
+from ray.rllib.models.torch.misc import SlimFC,normc_initializer
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
         super(ActorCritic, self).__init__()
@@ -137,16 +137,39 @@ class rlib_model_lstm(TorchRNN,nn.Module):
         self.obs_size = model_config["custom_model_config"]["obs"]
         self.fc_size = model_config["custom_model_config"]["fc_size"]
         self.lstm_state_size = model_config["custom_model_config"]["lstm_state_size"]
-        
+        activation = model_config.get("fcnet_activation")
+        fc_layers_count = model_config["custom_model_config"]["fc_layers_count"]
+
         obs_space = spaces.Box(-100,100,shape=(self.obs_size,))
 
-        self.model = FullyConnectedNetwork(
-            obs_space, action_space, 0, model_config, name
-        )
+
+        fc_layers = []
+        prev_layer_size = self.obs_size
+        for i in range(fc_layers_count):
+            fc_layers.append(
+                SlimFC(
+                    in_size=prev_layer_size,
+                    out_size=self.fc_size,
+                    initializer=normc_initializer(1.0),
+                    activation_fn=activation,
+                )
+            )
+            prev_layer_size = self.fc_size
+
+        self.fc_layers = nn.Sequential(*fc_layers)
 
         self.lstm = nn.LSTM(self.fc_size, self.lstm_state_size, batch_first=True)
 
-        self.action_layer = nn.Linear(self.lstm_state_size,num_outputs,True)
+        self.action_layer = SlimFC(
+            in_size=self.lstm_state_size,
+            out_size=num_outputs,
+            initializer=normc_initializer(0.01)
+        )
+
+        self.value_layer = SlimFC(
+            in_size=self.lstm_state_size,
+            out_size=1,
+            initializer=normc_initializer(0.01))
 
     @override(ModelV2)
     def get_initial_state(self):
@@ -155,8 +178,8 @@ class rlib_model_lstm(TorchRNN,nn.Module):
         # Place hidden states on same device as model.
         h = [
             #torch.zeros(self.num_recurrent_layers, batch_size, self.recurrent_hidden_size).to(device)
-            self.model._hidden_layers[0]._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
-            self.model._hidden_layers[0]._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
+            self.action_layer._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
+            self.action_layer._model[0].weight.new(1, self.lstm_state_size).zero_().squeeze(0),
         ]
         return h
 
@@ -171,12 +194,14 @@ class rlib_model_lstm(TorchRNN,nn.Module):
         # as input_dict may have extra zero-padding beyond seq_lens.max().
         # Use add_time_dimension to handle this
 
-
-        logits,state = self.model.forward(input_dict, state, seq_lens)
+        obs = obs.float()
+        obs = obs.reshape(obs.shape[0], -1)
+        fc_layers_output = self.fc_layers(obs)
 
         self.time_major = self.model_config.get("_time_major", False)
+
         inputs = add_time_dimension(
-            logits,
+            fc_layers_output,
             seq_lens=seq_lens,
             framework="torch",
             time_major=self.time_major,
@@ -187,9 +212,8 @@ class rlib_model_lstm(TorchRNN,nn.Module):
         
         output = torch.reshape(output, [-1, self.lstm_state_size])
 
-        self._features = torch.tanh(output)
+        self._features = output
 
-        self.model._features = self._features
         action_logits = self.action_layer(self._features)
 
         inf_mask = torch.clamp(torch.log(action_mask), min=FLOAT_MIN)
@@ -214,7 +238,7 @@ class rlib_model_lstm(TorchRNN,nn.Module):
         return output, [torch.squeeze(h, 0), torch.squeeze(c, 0)]
 
     def value_function(self):
-        return self.model.value_function()
+        return self.value_layer(self._features).squeeze(1)
 
 
 class MyPPO(PPO):
@@ -286,6 +310,18 @@ class statManager:
             )
 
         file.close()
+
+    def load_stat(self):
+        file = h5py.File("data_stat.h5", "r+")
+
+
+        self.obs_stat.obs_rms.mean = np.array(file["/obs_mean"]).astype("float32")
+        self.obs_stat.obs_rms.var = np.array(file["/obs_var"]).astype("float32")
+        self.obs_stat.obs_rms.count = 1000
+
+        self.rews_stat.return_rms.mean = np.array(file["/ret_mean"]).astype("float32")
+        self.rews_stat.return_rms.var = np.array(file["/ret_var"]).astype("float32")
+
 
 class NormalizeObservation():
     def __init__(

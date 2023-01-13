@@ -49,6 +49,20 @@ class Navigation_env():
         
         #goal_point = get_point_at_distance(distance)
 
+        if not self.layout.is_last_room:
+            self.system.create_detection_system()
+
+            total_status = []
+
+            total_status.extend(self.system.get_status(self.layout.next_rect))
+            total_status.extend(self.system.get_action_mask())
+            self.done = False
+            self.system.is_done = False
+            self.system.iteration = 0
+
+            self.send_queue.put(total_status)
+
+            return
 
         self.system.set_dim(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size),correct_value(goal[2],0,1,self.min_duct_size,self.max_duct_size))
 
@@ -97,12 +111,14 @@ class Navigation_env():
         if self.system.check_for_collision():
             self.system.is_done = 1
             self.done = True
+            self.layout.is_last_room = True
         elif self.system.is_successful(is_new_room):
             self.system.is_done = 3
             self.done = True
         elif self.system.max_iteration_exceeded() or self.layout.is_last_room: 
             self.system.is_done = 2
             self.done = True
+            self.layout.is_last_room = True
         else:
             self.system.is_done = 0
             self.done = False

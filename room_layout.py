@@ -17,7 +17,7 @@ class Layout():
         self.path_rects = []
         self.next_rect = None
         self.current_room = None
-        self.is_last_room = False
+        self.is_last_room = True
 
     def get_path_rects(self):
 
@@ -35,7 +35,7 @@ class Layout():
             return self.path_rects[-1], True
             
         
-        if self.rooms[self.current_room.number].is_inside(segmant.position):
+        if self.rooms[self.current_room.number].is_inside(segmant.movment_transform.origin):
             self.next_rect = self.path_rects[self.current_room.number] 
             self.current_room = self.rooms[self.current_room.number]
 

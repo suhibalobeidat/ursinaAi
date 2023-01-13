@@ -15,7 +15,7 @@ from utils import round_to_multiple
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.search.bayesopt import BayesOptSearch
 from typing import Any, Callable, Dict, List, Optional, Union, TYPE_CHECKING
-
+from ray.tune.utils import wait_for_gpu
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -47,8 +47,12 @@ class Trainable(tune.Trainable):
         fcnet_hiddens_layer_count= 2.0
         layer_width= 738.0168809379319 """
 
+        lstm_state_size = 256
+        wait_for_gpu(target_util=0.75)
     
         lr = float(config["lr"])
+        lambda_ = float(config["lambda_"])
+        gamma = float(config["gamma"])
         grad_clip = float(config["grad_clip"])
         num_sgd_iter = float(config["num_sgd_iter"])
         sgd_minibatch_size = float(config["sgd_minibatch_size"])
@@ -59,15 +63,16 @@ class Trainable(tune.Trainable):
         layer_width = float(config["layer_width"])
         fcnet_activation = float(config["fcnet_activation"])
         train_batch_size = float(config["train_batch_size"])
-        max_seq_len = float(config["max_seq_len"])
-
+        #max_seq_len = float(config["max_seq_len"])
+        #lstm_state_size = float(config["lstm_state_size"])
 
         num_sgd_iter = int(num_sgd_iter)
-        max_seq_len = round_to_multiple(max_seq_len,1,"up")
+        #max_seq_len = round_to_multiple(max_seq_len,1,"up")
         sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,128,"up")
         clip_param = round_to_multiple(clip_param, 0.1,"up")
         fcnet_hiddens_layer_count = round_to_multiple(fcnet_hiddens_layer_count,1,"up")
         layer_width = round_to_multiple(layer_width,128,"up")
+        #lstm_state_size = round_to_multiple(layer_width,128,"up")
         hidden_layers = [layer_width]*fcnet_hiddens_layer_count
         
 
@@ -91,6 +96,30 @@ class Trainable(tune.Trainable):
                 "teacher_args":teacher_args}
 
         config = PPOConfig(algo_class=MyPPO)
+
+
+        config.train_batch_size = train_batch_size
+        config.lr = lr
+        config.grad_clip = grad_clip
+        config.clip_param = clip_param
+        config.sgd_minibatch_size = sgd_minibatch_size
+        config.num_sgd_iter = num_sgd_iter
+        config.model["fcnet_hiddens"] = hidden_layers
+        config.model["fcnet_activation"] = fcnet_activation
+        config.vf_loss_coeff = vf_loss_coeff
+        config.entropy_coeff = entropy_coeff
+        config.lambda_ = lambda_
+        config.gamma = gamma
+        #config.model["max_seq_len"] = max_seq_len
+
+        config.model["custom_model"] = rlib_model
+        config.model["custom_model_config"] = {"obs":args.text_input_length,
+                                                "fc_size":layer_width,
+                                                "lstm_state_size":lstm_state_size,
+                                                "fc_layers_count":fcnet_hiddens_layer_count,
+                                                }
+        config.model["vf_share_layers"] = False
+
         config.framework(framework="torch")
         config.env = "UrsinaGym"
         config.disable_env_checking = False
@@ -104,23 +133,8 @@ class Trainable(tune.Trainable):
         config.num_gpus_per_worker = 0 
         config.num_cpus_per_worker = config.num_envs_per_worker
         config.remote_env_batch_wait_ms = 4
-        config.train_batch_size = train_batch_size
-        config.lr = lr
         config.vf_clip_param = 10
-        config.grad_clip = grad_clip
-        config.clip_param = clip_param
-        config.sgd_minibatch_size = sgd_minibatch_size
-        config.num_sgd_iter = num_sgd_iter
-        config.model["fcnet_hiddens"] = hidden_layers
-        config.model["fcnet_activation"] = fcnet_activation
-        config.model["vf_share_layers"] = False
-        config.vf_loss_coeff = vf_loss_coeff
-        config.entropy_coeff = entropy_coeff
-        config.model["custom_model"] = "rlib_model_lstm"
-        config.model["custom_model_config"] = {"obs":args.text_input_length,
-                                                "fc_size":layer_width,
-                                                "lstm_state_size":layer_width}
-        config.model["max_seq_len"] = max_seq_len
+
         config.batch_mode = "complete_episodes"
         config.horizon = 100
         config.log_level = "WARN"#"INFO"
@@ -179,20 +193,23 @@ if __name__ == '__main__':
     #teacher = Teacher.options(name="teacher").remote(teacher_args)
 
 
-    config = {"lr":tune.uniform(1e-6,2e-3),
+    config = {"lr":tune.uniform(1e-6,2e-4),
             "num_sgd_iter":tune.uniform(5,30),
             "sgd_minibatch_size":tune.uniform(65,20000),
             "clip_param":tune.uniform(0.01,0.3),
             "entropy_coeff":tune.uniform(0.0001,0.1),
-            "layer_width":tune.uniform(32,1024),
+            "layer_width":tune.uniform(32,2000),
             "vf_loss_coeff":tune.uniform(0.001,1),
-            "fcnet_hiddens_layer_count":tune.uniform(0.5,6),
+            "fcnet_hiddens_layer_count":tune.uniform(0.5,4),
             "fcnet_activation":tune.uniform(0,1),
             "train_batch_size":tune.uniform(1025,20000),
             "grad_clip":tune.uniform(0.001,1),
-            "max_seq_len":tune.uniform(0.5,20)
-            } 
+            "lambda_":tune.uniform(0.95,1),
+            "gamma":tune.uniform(0.9,0.99),
 
+            } 
+    #"max_seq_len":tune.uniform(0.5,20),
+    #"lstm_state_size":tune.uniform(32,1000)
     """ config = {
             "clip_param": tune.choice([0.001, 0.01, 0.05]),
             "entropy_coeff": tune.choice([0.0001, 0.001, 0.005]),
@@ -258,7 +275,7 @@ if __name__ == '__main__':
 
 
     search_alg=BayesOptSearch(
-            random_search_steps=10
+            random_search_steps=15
             )
 
     scheduler=AsyncHyperBandScheduler(
@@ -274,28 +291,32 @@ if __name__ == '__main__':
                 metric="episode_reward_mean",
                 scheduler=scheduler,
                 search_alg=search_alg,
-                num_samples=30
+                num_samples=30,
+                max_concurrent_trials=2
             ),
             run_config=RunConfig(
                 verbose=3,
                 stop=stopper,
                 failure_config=FailureConfig(
-                    fail_fast=True),
-                checkpoint_config=CheckpointConfig(num_to_keep=1,
-                checkpoint_at_end=True,
-                checkpoint_frequency=1,
-                checkpoint_score_attribute="episode_reward_mean")
+                    fail_fast=True
+                    ),
+                checkpoint_config=CheckpointConfig(
+                    num_to_keep=1,
+                    checkpoint_at_end=True,
+                    checkpoint_frequency=1,
+                    checkpoint_score_attribute="episode_reward_mean"
+                    )
 
             ),
 
         )
-    results = tuner.fit() """
+    results = tuner.fit()  """
 
-    tune.run(resume=True,
+    tune.run(resume=False,
     fail_fast=True,
     checkpoint_at_end=True,
     local_dir=r"C:\Users\sohai\ray_results",
-    name="Trainable_2023-01-07_15-43-19",
+    name=None,#"Trainable_2023-01-12_21-28-27",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,
@@ -306,9 +327,9 @@ if __name__ == '__main__':
     mode="max",
     metric="episode_reward_mean",
     num_samples=30,
+    max_concurrent_trials=2,
     scheduler=scheduler,
-    search_alg=search_alg)
+    search_alg=search_alg) 
 
-
-    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2023-01-07_15-43-19",resume_errored=True)
+    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2023-01-09_13-59-47",resume_errored=True)
     #results = tuner.fit()
