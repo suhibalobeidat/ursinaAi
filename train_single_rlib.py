@@ -45,9 +45,9 @@ class Trainable(tune.Trainable):
 
     
         lr = float(config["lr"])
-        lambda_ = float(config["lambda_"])
-        gamma = float(config["gamma"])
-        grad_clip = float(config["grad_clip"])
+        #lambda_ = float(config["lambda_"])
+        #gamma = float(config["gamma"])
+        grad_clip = 0.5#float(config["grad_clip"])
         num_sgd_iter = float(config["num_sgd_iter"])
         sgd_minibatch_size = float(config["sgd_minibatch_size"])
         clip_param = float(config["clip_param"])
@@ -101,8 +101,8 @@ class Trainable(tune.Trainable):
         config.model["fcnet_activation"] = fcnet_activation
         config.vf_loss_coeff = vf_loss_coeff
         config.entropy_coeff = entropy_coeff
-        config.lambda_ = lambda_
-        config.gamma = gamma
+        #config.lambda_ = lambda_
+        #config.gamma = gamma
         #config.model["max_seq_len"] = 20
 
         config.model["custom_model"] = rlib_model
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
     teacher_args = get_args()
 
-    """ config = {
+    config = {
     "clip_param": 0.01,
     "entropy_coeff": 0.001,
     "fcnet_activation": 0.1823053454576449,
@@ -179,9 +179,9 @@ if __name__ == '__main__':
     "sgd_minibatch_size": 5398.568478435033,
     "train_batch_size": 7583.765925047164,
     "vf_loss_coeff": 0.1
-    } """
+    } 
 
-    config = {
+    """ config = {
     "clip_param": 0.176192007866709,
     "entropy_coeff": 0.006033957647477133,
     "fcnet_activation": 0.595773002166077,
@@ -195,7 +195,7 @@ if __name__ == '__main__':
     "sgd_minibatch_size": 18023.642141369033,
     "train_batch_size": 10096.024045377108,
     "vf_loss_coeff": 0.5135697404733504
-    }
+    } """
 
     """ trainable_with_resources  = tune.with_resources(
         tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
@@ -219,7 +219,7 @@ if __name__ == '__main__':
     #teacher = Teacher.options(name="teacher").remote(teacher_args)
     stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
-    stat_manager.load_stat.remote()
+    #stat_manager.load_stat.remote()
 
     result = tune.run(
         run_or_experiment=trainable_with_resources,

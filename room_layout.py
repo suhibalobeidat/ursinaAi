@@ -21,7 +21,7 @@ class Layout():
 
     def get_path_rects(self):
 
-        for i in range(4):         
+        for i in range(self.max_rooms_number-1):         
             opening = self.rooms[i].openings[-1]
             rect = create_rect(opening)
             self.path_rects.append(rect)
@@ -48,7 +48,7 @@ class Layout():
 
 
     def is_inside_last_room(self,segmant):
-        if self.rooms[self.max_rooms_number-2].is_inside(segmant.position):
+        if self.rooms[self.max_rooms_number-2].is_inside(segmant.movment_transform.origin):
             return True
     
         return False

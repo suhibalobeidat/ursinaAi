@@ -16,6 +16,7 @@ from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.search.bayesopt import BayesOptSearch
 from typing import Any, Callable, Dict, List, Optional, Union, TYPE_CHECKING
 from ray.tune.utils import wait_for_gpu
+import ray
 
 parser = argparse.ArgumentParser(description='PPO')
 parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
@@ -42,6 +43,10 @@ parser.add_argument('--sageMaker', type=bool, default=False, help='number of par
 
 class Trainable(tune.Trainable):
     def setup(self, config,teacher_args=None):
+
+
+        self.stat_manager = statManager.remote((args.text_input_length,))
+
 
         """ fcnet_activation = 0.1823053454576449
         fcnet_hiddens_layer_count= 2.0
@@ -93,7 +98,8 @@ class Trainable(tune.Trainable):
                 "min_size":75,
                 "max_size":250,
                 "is_teacher":False,
-                "teacher_args":teacher_args}
+                "teacher_args":teacher_args,
+                "stat_manager":self.stat_manager}
 
         config = PPOConfig(algo_class=MyPPO)
 
@@ -177,14 +183,17 @@ class Trainable(tune.Trainable):
 
         return True
 
-
+    def cleanup(self):
+        return
+        self.algo.cleanup()
+        ray.kill(self.stat_manager)
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     register_env("UrsinaGym", lambda config: UrsinaGym(config))
     ModelCatalog.register_custom_model("rlib_model", rlib_model)
-    ModelCatalog.register_custom_model("rlib_model_lstm", rlib_model_lstm)
+    #ModelCatalog.register_custom_model("rlib_model_lstm", rlib_model_lstm)
     tune.register_trainable("MyTrainable",Trainable)
 
 
@@ -230,11 +239,11 @@ if __name__ == '__main__':
     trainable_with_resources  = tune.with_resources(
         Trainable,tune.PlacementGroupFactory([
             {"CPU": 7, "GPU": 0.5},
+            {"CPU": 1},
         ])) 
 
     stopper = CustomStopper()
 
-    stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
 
     """ pbt = PB2(
@@ -283,7 +292,7 @@ if __name__ == '__main__':
             grace_period=200000,
             max_t=700000
             )
-    """ tuner = tune.Tuner(
+    tuner = tune.Tuner(
             trainable_with_resources,
             param_space=config,
             tune_config=tune.TuneConfig(
@@ -291,12 +300,13 @@ if __name__ == '__main__':
                 metric="episode_reward_mean",
                 scheduler=scheduler,
                 search_alg=search_alg,
-                num_samples=30,
+                num_samples=35,
                 max_concurrent_trials=2
             ),
             run_config=RunConfig(
                 verbose=3,
                 stop=stopper,
+                log_to_file=True,
                 failure_config=FailureConfig(
                     fail_fast=True
                     ),
@@ -310,13 +320,13 @@ if __name__ == '__main__':
             ),
 
         )
-    results = tuner.fit()  """
+    results = tuner.fit()  
 
-    tune.run(resume=False,
+    """ tune.run(resume="LOCAL",
     fail_fast=True,
     checkpoint_at_end=True,
     local_dir=r"C:\Users\sohai\ray_results",
-    name=None,#"Trainable_2023-01-12_21-28-27",
+    name="Trainable_2023-01-14_16-51-39",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,
@@ -324,12 +334,13 @@ if __name__ == '__main__':
     checkpoint_score_attr="episode_reward_mean",
     verbose=3,
     stop=stopper,
+    log_to_file=True,
     mode="max",
     metric="episode_reward_mean",
     num_samples=30,
     max_concurrent_trials=2,
     scheduler=scheduler,
-    search_alg=search_alg) 
+    search_alg=search_alg)  """
 
-    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2023-01-09_13-59-47",resume_errored=True)
+    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2023-01-14_16-51-39")
     #results = tuner.fit()

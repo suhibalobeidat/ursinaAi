@@ -57,7 +57,6 @@ class Navigation_env():
             total_status.extend(self.system.get_status(self.layout.next_rect))
             total_status.extend(self.system.get_action_mask())
             self.done = False
-            self.system.is_done = False
             self.system.iteration = 0
 
             self.send_queue.put(total_status)

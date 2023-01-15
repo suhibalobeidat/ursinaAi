@@ -86,15 +86,15 @@ class UrsinaGym(gym.Env):
         obs_size = env_config["obs_size"]
         
         self.observation_space = self.observation_space = spaces.Dict({
-            "obs": spaces.Box(-100., 100., shape=(obs_size,)),
+            "obs": spaces.Box(-10., 10., shape=(obs_size,)),
             "action_mask": spaces.Box(0, 1, shape=(mask_size, ))
         })
         self.action_space = spaces.Discrete(mask_size)
 
-        self.statManager = ray.get_actor("statManager")
+        self.statManager = env_config["stat_manager"]#ray.get_actor("statManager")
 
         env = InnerEnv(env_config)
-        #env = NormalizeObservation(env)
+        env = NormalizeObservation(env)
         #env = NormalizeReward(env)
         self.inner_env = env
 
@@ -106,6 +106,8 @@ class UrsinaGym(gym.Env):
         self.ret_var = np.ones((), "float64")
 
         self.epsilon=1e-4
+        self.clipob = 10
+        self.cliprew = 10
 
     def reset(self):      
         self.obs = []
@@ -114,7 +116,7 @@ class UrsinaGym(gym.Env):
 
         self.obs.append(obs)
 
-        obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
+        obs = np.clip((obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon), -self.clipob, self.clipob)
 
         observation = {"obs":obs,"action_mask":info["action_mask"]}
 
@@ -131,10 +133,10 @@ class UrsinaGym(gym.Env):
         if terminated:
             self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(np.stack(self.obs),self.rews))
 
-        obs = (obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon)
+        obs = np.clip((obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon), -self.clipob, self.clipob)
 
-        reward = reward / np.sqrt(self.ret_var + self.epsilon)
-
+        reward = np.clip(reward / np.sqrt(self.ret_var + self.epsilon), -self.cliprew, self.cliprew)
+        
         observation = {"obs":obs,"action_mask":info["action_mask"]}
 
         return observation, reward, terminated, info
