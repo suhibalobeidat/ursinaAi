@@ -53,7 +53,7 @@ class Trainable(tune.Trainable):
         layer_width= 738.0168809379319 """
 
         lstm_state_size = 256
-        wait_for_gpu(target_util=0.75)
+        #wait_for_gpu(target_util=0.75)
     
         lr = float(config["lr"])
         lambda_ = float(config["lambda_"])
@@ -203,18 +203,18 @@ if __name__ == '__main__':
 
 
     config = {"lr":tune.uniform(1e-6,2e-4),
-            "num_sgd_iter":tune.uniform(5,30),
+            "num_sgd_iter":tune.uniform(5,25),
             "sgd_minibatch_size":tune.uniform(65,20000),
             "clip_param":tune.uniform(0.01,0.3),
             "entropy_coeff":tune.uniform(0.0001,0.1),
             "layer_width":tune.uniform(32,2000),
             "vf_loss_coeff":tune.uniform(0.001,1),
-            "fcnet_hiddens_layer_count":tune.uniform(0.5,4),
+            "fcnet_hiddens_layer_count":tune.uniform(0.5,5),
             "fcnet_activation":tune.uniform(0,1),
             "train_batch_size":tune.uniform(1025,20000),
             "grad_clip":tune.uniform(0.001,1),
             "lambda_":tune.uniform(0.95,1),
-            "gamma":tune.uniform(0.9,0.99),
+            "gamma":tune.uniform(0.8,0.99),
 
             } 
     #"max_seq_len":tune.uniform(0.5,20),
@@ -284,7 +284,7 @@ if __name__ == '__main__':
 
 
     search_alg=BayesOptSearch(
-            random_search_steps=15
+            random_search_steps=10
             )
 
     scheduler=AsyncHyperBandScheduler(
@@ -292,7 +292,7 @@ if __name__ == '__main__':
             grace_period=200000,
             max_t=700000
             )
-    tuner = tune.Tuner(
+    """ tuner = tune.Tuner(
             trainable_with_resources,
             param_space=config,
             tune_config=tune.TuneConfig(
@@ -320,13 +320,12 @@ if __name__ == '__main__':
             ),
 
         )
-    results = tuner.fit()  
+    results = tuner.fit()   """
 
-    """ tune.run(resume="LOCAL",
-    fail_fast=True,
+    tune.run(resume="AUTO",
     checkpoint_at_end=True,
     local_dir=r"C:\Users\sohai\ray_results",
-    name="Trainable_2023-01-14_16-51-39",
+    name=None,#"Trainable_2023-01-17_12-10-00",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,
@@ -340,7 +339,6 @@ if __name__ == '__main__':
     num_samples=30,
     max_concurrent_trials=2,
     scheduler=scheduler,
-    search_alg=search_alg)  """
+    search_alg=search_alg)  
 
-    #tuner = tune.Tuner.restore(r"C:\Users\sohai\ray_results\Trainable_2023-01-14_16-51-39")
-    #results = tuner.fit()
+

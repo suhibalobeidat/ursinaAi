@@ -91,12 +91,9 @@ class UrsinaGym(gym.Env):
         })
         self.action_space = spaces.Discrete(mask_size)
 
-        self.statManager = env_config["stat_manager"]#ray.get_actor("statManager")
+        self.statManager = env_config["stat_manager"]
 
-        env = InnerEnv(env_config)
-        env = NormalizeObservation(env)
-        #env = NormalizeReward(env)
-        self.inner_env = env
+        self.inner_env = InnerEnv(env_config)
 
         self.obs = []
         self.rews = []
@@ -138,6 +135,8 @@ class UrsinaGym(gym.Env):
         reward = np.clip(reward / np.sqrt(self.ret_var + self.epsilon), -self.cliprew, self.cliprew)
         
         observation = {"obs":obs,"action_mask":info["action_mask"]}
+
+        print("rewaaaard",reward)
 
         return observation, reward, terminated, info
 
