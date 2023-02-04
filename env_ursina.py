@@ -12,7 +12,7 @@ from ursina import *
 
 def create_env(min_size,max_size,receive_queue = None,send_queue = None, same_process = False):
     app = Ursina()
-    navigation_env = Navigation_env(min_size,max_size,receive_queue,send_queue)
+    navigation_env = Navigation_env(app,min_size,max_size,receive_queue,send_queue)
     app.set_env(navigation_env)
 
     if not same_process:
@@ -21,12 +21,13 @@ def create_env(min_size,max_size,receive_queue = None,send_queue = None, same_pr
         return app
 
 class Navigation_env():
-    def __init__(self,min_size,max_size,receive_queue,send_queue):
+    def __init__(self,app,min_size,max_size,receive_queue,send_queue):
+        self.app = app
         self.action_space = ActionSpace.DISCRETE
         self.receive_queue = receive_queue
         self.send_queue = send_queue
         self.radius_mul = 1
-        self.max_iteration = 100
+        self.max_iteration = 50
         self.max_room_number = 5
         self.actions = 29
         self.min_duct_size = min_size#mm
@@ -36,12 +37,14 @@ class Navigation_env():
         self.system = None
         self.layout = None
         self.done = True
+        self.restart = True
+        self.error = False
 
     def init(self):
         self.system = System(shape=ConnectorShape.Rectangle,max_iteration=self.max_iteration,radius_mul=self.radius_mul)
         self.layout = Layout(max_rooms_number=self.max_room_number, min_distance=self.min_distance)
 
-        self.send_queue.put(1)
+        self.send_queue.put([True])
 
 
     def reset(self, goal):
@@ -49,7 +52,24 @@ class Navigation_env():
         
         #goal_point = get_point_at_distance(distance)
 
-        if not self.layout.is_last_room:
+        if not self.restart:
+
+            last_segmant = self.system.system_segmants.pop()
+            pos = -1
+            if len(self.system.system_segmants)>0:
+                before_last_segmant = self.system.system_segmants.pop()
+                pos = -2
+
+            for segmant in self.system.system_segmants:
+                destroy(segmant)
+
+            if pos == -1:
+                self.system.system_segmants = [last_segmant]
+            else:
+                self.system.system_segmants = [before_last_segmant,last_segmant]
+            
+            self.system.system_connectors = self.system.system_connectors[pos:]
+
             self.system.create_detection_system()
 
             total_status = []
@@ -57,11 +77,12 @@ class Navigation_env():
             total_status.extend(self.system.get_status(self.layout.next_rect))
             total_status.extend(self.system.get_action_mask())
             self.done = False
+            self.system.is_done = 0
             self.system.iteration = 0
 
             self.send_queue.put(total_status)
 
-            return
+            return 
 
         self.system.set_dim(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size),correct_value(goal[2],0,1,self.min_duct_size,self.max_duct_size))
 
@@ -84,6 +105,8 @@ class Navigation_env():
         total_status.extend(self.system.get_status(self.layout.next_rect))
         total_status.extend(self.system.get_action_mask())
         self.done = False
+        self.restart = False
+        self.error = False
 
         self.send_queue.put(total_status)
 
@@ -91,7 +114,11 @@ class Navigation_env():
         self.system.reset()
         self.layout.reset()
 
+
+    def close(self):
+        self.app.application.quit()
         self.send_queue.put([True])
+
 
     def step(self,action):
         if self.action_space == ActionSpace.DISCRETE:
@@ -106,21 +133,30 @@ class Navigation_env():
         total_status = []
         total_status.extend(self.system.get_status(next_rect))
 
+        is_collide = False
+        try:
+            is_collide = self.system.check_for_collision()
+        except:
+            self.error = True
         
-        if self.system.check_for_collision():
+        if is_collide:
             self.system.is_done = 1
             self.done = True
-            self.layout.is_last_room = True
+            self.restart = True
         elif self.system.is_successful(is_new_room):
             self.system.is_done = 3
             self.done = True
-        elif self.system.max_iteration_exceeded() or self.layout.is_last_room: 
+        #elif self.system.max_iteration_exceeded() or self.layout.is_last_room: 
+        elif self.system.max_iteration_exceeded() or self.error: 
             self.system.is_done = 2
             self.done = True
-            self.layout.is_last_room = True
+            self.restart = True
         else:
             self.system.is_done = 0
             self.done = False
+
+        if self.layout.is_last_room:
+            self.restart = True
 
 
         total_status.extend(self.system.get_action_mask())
@@ -163,6 +199,8 @@ class Navigation_env():
             self.send_queue.put([self.done])   
         elif Commands(command) == Commands.clear:
             self.clear()
+        elif Commands(command) == Commands.close:
+            self.close()
 
 
 class MyQueue():
@@ -209,7 +247,7 @@ class env_interface():
         
         received_data = self.receive_queue.get()
 
-        return received_data
+        return received_data[0]
 
     def reset(self,goal):
 
@@ -269,6 +307,15 @@ class env_interface():
             self.app.step()
         received_data = self.receive_queue.get()
         return received_data
+
+    def close(self):
+        data = []
+        data.append(6.)
+        self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
+        received_data = self.receive_queue.get()
+        return received_data[0]
 
 
 class parallel_envs():

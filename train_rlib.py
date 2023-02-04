@@ -145,6 +145,7 @@ class Trainable(tune.Trainable):
         config.horizon = 100
         config.log_level = "WARN"#"INFO"
         config.create_env_on_local_worker = True
+
         if config.create_env_on_local_worker:
             config.num_cpus_for_local_worker = config.num_envs_per_worker
         config.evaluation_interval = None
@@ -155,6 +156,7 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
+        self.stat_manager.save_stat.remote(checkpoint_dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     
     def load_checkpoint(self, checkpoint: Union[Dict, str]):
@@ -184,7 +186,6 @@ class Trainable(tune.Trainable):
         return True
 
     def cleanup(self):
-        return
         self.algo.cleanup()
         ray.kill(self.stat_manager)
 
@@ -300,15 +301,14 @@ if __name__ == '__main__':
                 metric="episode_reward_mean",
                 scheduler=scheduler,
                 search_alg=search_alg,
-                num_samples=35,
-                max_concurrent_trials=2
-            ),
+                num_samples=30            
+                ),
             run_config=RunConfig(
                 verbose=3,
                 stop=stopper,
                 log_to_file=True,
                 failure_config=FailureConfig(
-                    fail_fast=True
+                    max_failures=-1
                     ),
                 checkpoint_config=CheckpointConfig(
                     num_to_keep=1,
@@ -320,12 +320,12 @@ if __name__ == '__main__':
             ),
 
         )
-    results = tuner.fit()   """
+    results = tuner.fit()    """
 
-    tune.run(resume="AUTO",
+    tune.run(resume="AUTO+RESTART_ERRORED",
     checkpoint_at_end=True,
     local_dir=r"C:\Users\sohai\ray_results",
-    name=None,#"Trainable_2023-01-17_12-10-00",
+    name="Trainable_2023-01-24_14-14-54",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,
@@ -338,7 +338,8 @@ if __name__ == '__main__':
     metric="episode_reward_mean",
     num_samples=30,
     max_concurrent_trials=2,
+    max_failures=-1,
     scheduler=scheduler,
-    search_alg=search_alg)  
+    search_alg=search_alg)   
 
 

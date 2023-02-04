@@ -37,6 +37,7 @@ class Commands(enum.Enum):
    get_action = 3
    done = 4
    clear = 5
+   close = 6
 
 
 class ActionSpace(enum.Enum):

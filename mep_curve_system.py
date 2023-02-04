@@ -18,10 +18,11 @@ class System():
         self.depth_map = []
         self.action_mask = []
         self.is_collide = False
-        self.is_done = True
+        self.is_done = 0
         self.angles = [11.25,22.5,30,45,60,90]
         self.plane_angles = [0, -11.25, -22.5, -30, -45, -60, -90, 11.25, 22.5, 30, 45, 60, 90]
-        
+        self.straight_segmant_action = [0.1,0.5,1,5,10]
+
         self.depth_map_xRange = 270
         self.depth_map_yRange = 270
         self.depth_map_angle_offset = 15
@@ -201,23 +202,52 @@ class System():
             if i == 0:
                 for k in range(2):
                     for j in range(6):
-                        if self.system_segmants[-1].net_length - get_elbow_length(self.angles[j],self.width,self.radius_mul) < 0.01:
+                        new_elbow_length = get_elbow_length(self.angles[j],self.width,self.radius_mul)
+                        if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
                         else:
-                            self.action_mask.append(1)
+                            if k == 0:
+                                if self.depth_map[j+1] <= new_elbow_length:
+                                    self.action_mask.append(0)
+                                else:
+                                    self.action_mask.append(1)
+                            elif k == 1:
+                                if self.depth_map[j+7] <= new_elbow_length:
+                                    self.action_mask.append(0)
+                                else:
+                                    self.action_mask.append(1)
             else:
                 for k in range(2):
                     for j in range(6):
-                        if self.system_segmants[-1].net_length - get_elbow_length(self.angles[j],self.height,self.radius_mul) < 0.01:
+                        new_elbow_length = get_elbow_length(self.angles[j],self.height,self.radius_mul)
+                        if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
                         else:
-                            self.action_mask.append(1)
+                            if k == 0:
+                                if self.depth_map[j+1] <= new_elbow_length:
+                                    self.action_mask.append(0)
+                                else:
+                                    self.action_mask.append(1)
+                            elif k == 1:
+                                if self.depth_map[j+7] <= new_elbow_length:
+                                    self.action_mask.append(0)
+                                else:
+                                    self.action_mask.append(1)
 
-        self.action_mask.append(1)
-        self.action_mask.append(1)
-        self.action_mask.append(1)
-        self.action_mask.append(1)
-        self.action_mask.append(1)
+        for straight_action in self.straight_segmant_action:
+            if straight_action < self.depth_map[0]:
+                self.action_mask.append(0)
+            else:
+                self.action_mask.append(1)
+
+        if 1 not in self.action_mask:
+            self.action_mask[-1] = 1
+
+        #self.action_mask.append(1)
+        #self.action_mask.append(1)
+        #self.action_mask.append(1)
+        #self.action_mask.append(1)
+        #self.action_mask.append(1)
 
         return self.action_mask
 

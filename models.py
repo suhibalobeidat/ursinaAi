@@ -288,9 +288,9 @@ class statManager:
         return self.obs_stat.obs_rms.mean,self.obs_stat.obs_rms.var,self.rews_stat.return_rms.mean,self.rews_stat.return_rms.var
 
 
-    def save_stat(self):
+    def save_stat(self,dir,file_name):
 
-        file = h5py.File("data_stat.h5", "w")
+        file = h5py.File(dir+"/"+file_name, "w")
 
         file.create_dataset(
                 "obs_mean", np.shape(self.obs_stat.obs_rms.mean), data=self.obs_stat.obs_rms.mean

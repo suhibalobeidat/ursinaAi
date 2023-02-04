@@ -53,18 +53,20 @@ class InnerEnv(gym.Env):
         done = receivedData[len(receivedData)-2]
         reward = receivedData[len(receivedData)-1]
 
-        if done == 2:
-            terminated = True 
-            truncated = True
-        elif done == 3:
-            terminated = True
-            truncated = False
-        elif done == 0:
+        if done == 0:
             terminated = False
             truncated = True
-        else:
-            terminated = bool(done)
+        elif done == 1:#collide
+            terminated = True
             truncated = False
+        elif done == 2:#max iteration exceeded
+            terminated = True 
+            truncated = True
+        elif done == 3:#successful
+            terminated = True
+            truncated = False
+
+
 
         if self.is_teacher:
             gamma = pow(0.99,self.steps)
@@ -79,6 +81,9 @@ class InnerEnv(gym.Env):
 
     def render(self):
         return None
+
+    def close(self):
+        self.env.close()
 class UrsinaGym(gym.Env):
     def __init__(self,env_config):
 
@@ -91,7 +96,11 @@ class UrsinaGym(gym.Env):
         })
         self.action_space = spaces.Discrete(mask_size)
 
-        self.statManager = env_config["stat_manager"]
+        """ self.statManager = None
+        if env_config["stat_manager"]:
+            self.statManager = env_config["stat_manager"] """
+        
+        self.statManager = ray.get_actor("statManager")
 
         self.inner_env = InnerEnv(env_config)
 
@@ -127,8 +136,9 @@ class UrsinaGym(gym.Env):
         self.obs.append(obs)
         self.rews.append(reward)
         
-        if terminated:
-            self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(np.stack(self.obs),self.rews))
+        if self.statManager:
+            if terminated:
+                self.obs_mean,self.obs_var,_,self.ret_var = ray.get(self.statManager.update_mean_var.remote(np.stack(self.obs),self.rews))
 
         obs = np.clip((obs - self.obs_mean) / np.sqrt(self.obs_var + self.epsilon), -self.clipob, self.clipob)
 
@@ -136,13 +146,14 @@ class UrsinaGym(gym.Env):
         
         observation = {"obs":obs,"action_mask":info["action_mask"]}
 
-        print("rewaaaard",reward)
-
         return observation, reward, terminated, info
 
 
     def render(self):
         return None
+
+    def close(self):
+        self.inner_env.close()
 
 
 def make_env(env_config = None)-> gym.Env:

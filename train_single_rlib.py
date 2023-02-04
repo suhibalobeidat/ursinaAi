@@ -14,6 +14,8 @@ from utils import round_to_multiple
 from ray.tune.utils import wait_for_gpu,validate_save_restore
 from typing import Any, Callable, Dict, List, Optional, Union, TYPE_CHECKING
 import ray.tune.search.sample
+from ray.air.config import RunConfig,CheckpointConfig
+from ray.air import FailureConfig
 
 
 
@@ -43,11 +45,15 @@ parser.add_argument('--sageMaker', type=bool, default=False, help='number of par
 class Trainable(tune.Trainable):
     def setup(self, config,teacher_args=None):
 
-    
+        self.stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
+
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,2"
+        self.stat_manager.save_stat.remote(dir,"data_stat.h5")
+
         lr = float(config["lr"])
-        #lambda_ = float(config["lambda_"])
-        #gamma = float(config["gamma"])
-        grad_clip = 0.5#float(config["grad_clip"])
+        lambda_ = float(config["lambda_"])
+        gamma = float(config["gamma"])
+        grad_clip = float(config["grad_clip"])
         num_sgd_iter = float(config["num_sgd_iter"])
         sgd_minibatch_size = float(config["sgd_minibatch_size"])
         clip_param = float(config["clip_param"])
@@ -79,12 +85,13 @@ class Trainable(tune.Trainable):
         
 
         env_config = {
-                "obs_size":args.text_input_length,
+                "obs_size":34,
                 "mask_size":29,
                 "min_size":75,
                 "max_size":250,
                 "is_teacher":False,
-                "teacher_args":teacher_args}
+                "teacher_args":teacher_args,
+                "stat_manager":None}
 
         config = PPOConfig(algo_class=MyPPO)
 
@@ -101,8 +108,8 @@ class Trainable(tune.Trainable):
         config.model["fcnet_activation"] = fcnet_activation
         config.vf_loss_coeff = vf_loss_coeff
         config.entropy_coeff = entropy_coeff
-        #config.lambda_ = lambda_
-        #config.gamma = gamma
+        config.lambda_ = lambda_
+        config.gamma = gamma
         #config.model["max_seq_len"] = 20
 
         config.model["custom_model"] = rlib_model
@@ -149,8 +156,8 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        statManager = ray.get_actor("statManager")
-        statManager.save_stat.remote()
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,2"
+        self.stat_manager.save_stat.remote(dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     
     def load_checkpoint(self, checkpoint: Union[Dict, str]):
@@ -169,16 +176,19 @@ if __name__ == '__main__':
     teacher_args = get_args()
 
     config = {
-    "clip_param": 0.01,
-    "entropy_coeff": 0.001,
-    "fcnet_activation": 0.1823053454576449,
-    "fcnet_hiddens_layer_count": 2.0,
-    "layer_width": 738.0168809379319,
-    "lr": 0.00015586661343287977,
-    "num_sgd_iter": 13.394627394465651,
-    "sgd_minibatch_size": 5398.568478435033,
-    "train_batch_size": 7583.765925047164,
-    "vf_loss_coeff": 0.1
+        "clip_param": 0.2824546930536148,
+        "entropy_coeff": 0.08949325230772212,
+        "fcnet_activation": 0.5978999788110851,
+        "fcnet_hiddens_layer_count": 4.6484340576040255,
+        "gamma": 0.8168135753898648,
+        "grad_clip": 0.19678687955672605,
+        "lambda_": 0.9522613644455269,
+        "layer_width": 672.2500909421042,
+        "lr": 7.834678064820692e-05,
+        "num_sgd_iter": 10.426980635477918,
+        "sgd_minibatch_size": 16585.88224494371,
+        "train_batch_size": 7794.394374010856,
+        "vf_loss_coeff": 0.2816535751776934
     } 
 
     """ config = {
@@ -213,22 +223,52 @@ if __name__ == '__main__':
         tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
             {"CPU": 7, "GPU": 0.5},
             {"CPU":7, "GPU": 0.5},
+            {"CPU":1}
         ]))  
     #stopper = CustomStopper()
 
     #teacher = Teacher.options(name="teacher").remote(teacher_args)
-    stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
+    #stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
     #stat_manager.load_stat.remote()
+
+    """ tuner = tune.Tuner(
+            trainable_with_resources,
+            param_space=config,
+            tune_config=tune.TuneConfig(
+                mode="max",
+                metric="episode_reward_mean",
+                ),
+            run_config=RunConfig(
+                local_dir=r"C:\Users\sohai\ray_results\tensorboard",
+                name="Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,2",
+                verbose=3,
+                log_to_file=True,
+                failure_config=FailureConfig(
+                    max_failures=-1
+                    ),
+                checkpoint_config=CheckpointConfig(
+                    num_to_keep=1,
+                    checkpoint_at_end=True,
+                    checkpoint_frequency=1,
+                    checkpoint_score_attribute="episode_reward_mean"
+                    )
+            ),
+
+        )
+        
+    results = tuner.fit()     """
 
     result = tune.run(
         run_or_experiment=trainable_with_resources,
         config=config,
         local_dir=r"C:\Users\sohai\ray_results\tensorboard",
+        name="Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,2",
         checkpoint_at_end=True,
         log_to_file=True,
-        checkpoint_freq=4,
+        checkpoint_freq=1,
         keep_checkpoints_num=1,
-        checkpoint_score_attr="episode_reward_mean"
-        )  
+        checkpoint_score_attr="episode_reward_mean",
+        num_samples=1
+        )   
  

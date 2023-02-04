@@ -17,7 +17,7 @@ class Layout():
         self.path_rects = []
         self.next_rect = None
         self.current_room = None
-        self.is_last_room = True
+        self.is_last_room = False
 
     def get_path_rects(self):
 
