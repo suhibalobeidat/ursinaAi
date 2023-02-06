@@ -115,7 +115,7 @@ class rlib_model(TorchModelV2,nn.Module):
   
         inf_mask = torch.clamp(torch.log(action_mask), min=FLOAT_MIN)
 
-        masked_logits = logits #+ inf_mask
+        masked_logits = logits + inf_mask
 
         return masked_logits,state
 

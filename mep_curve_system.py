@@ -30,6 +30,7 @@ class System():
 
         self.is_create_detection_system = True
         self._is_collision_detection = True
+        self.is_dead_end = False
 
         self.iteration = 0
    
@@ -104,7 +105,7 @@ class System():
         movment_direction = MovmentDirection.Z
         new_segmant_length = action_length
 
-        if action_direction >= 0 and action_direction < 6:
+        if action_direction >= 0 and action_direction < 6:#positive x negative angle
             angle = self.get_angle(action_direction)
             new_segmant_length_reduction = get_elbow_length(angle,self.width,self.radius_mul)
             new_segmant_length = new_segmant_length_reduction + action_length
@@ -117,7 +118,7 @@ class System():
 
             angle = -angle
 
-        elif action_direction >= 6 and action_direction < 12:
+        elif action_direction >= 6 and action_direction < 12:#negative x positive angle
             angle = self.get_angle(action_direction)
 
             new_segmant_length_reduction = get_elbow_length(angle,self.width,self.radius_mul)
@@ -130,7 +131,7 @@ class System():
 
             movment_direction = MovmentDirection.X
 
-        elif action_direction >= 12 and action_direction < 18:
+        elif action_direction >= 12 and action_direction < 18:#positive y positive angle
             angle = self.get_angle(action_direction)
             new_segmant_length_reduction = get_elbow_length(angle,self.height,self.radius_mul)
             new_segmant_length = new_segmant_length_reduction + action_length
@@ -141,7 +142,7 @@ class System():
             movment_direction = MovmentDirection.Y
 
 
-        elif action_direction >= 18 and action_direction < 24:
+        elif action_direction >= 18 and action_direction < 24:#negative y negative angle
             angle = self.get_angle(action_direction)
             new_segmant_length_reduction = get_elbow_length(angle,self.height,self.radius_mul)
             new_segmant_length = new_segmant_length_reduction + action_length
@@ -201,46 +202,51 @@ class System():
         for i in range(2):
             if i == 0:
                 for k in range(2):
-                    for j in range(6):
+                    for j in range(len(self.angles)):
+
                         new_elbow_length = get_elbow_length(self.angles[j],self.width,self.radius_mul)
+
                         if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
                         else:
-                            if k == 0:
-                                if self.depth_map[j+1] <= new_elbow_length:
+                            if k == 0:#positive x
+                                if new_elbow_length >= self.depth_map[j+13]:
                                     self.action_mask.append(0)
                                 else:
                                     self.action_mask.append(1)
-                            elif k == 1:
-                                if self.depth_map[j+7] <= new_elbow_length:
+                            elif k == 1:#negative x
+                                if new_elbow_length >= self.depth_map[j+19]:
                                     self.action_mask.append(0)
                                 else:
                                     self.action_mask.append(1)
             else:
                 for k in range(2):
-                    for j in range(6):
+                    for j in range(len(self.angles)):
+
                         new_elbow_length = get_elbow_length(self.angles[j],self.height,self.radius_mul)
+
                         if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
                         else:
-                            if k == 0:
-                                if self.depth_map[j+1] <= new_elbow_length:
+                            if k == 0:#positive y
+                                if new_elbow_length >= self.depth_map[j+7]:
                                     self.action_mask.append(0)
                                 else:
                                     self.action_mask.append(1)
-                            elif k == 1:
-                                if self.depth_map[j+7] <= new_elbow_length:
+                            elif k == 1:#negative y
+                                if new_elbow_length >= self.depth_map[j+1]:
                                     self.action_mask.append(0)
                                 else:
                                     self.action_mask.append(1)
 
         for straight_action in self.straight_segmant_action:
-            if straight_action < self.depth_map[0]:
+            if straight_action >= self.depth_map[0]:
                 self.action_mask.append(0)
             else:
                 self.action_mask.append(1)
 
         if 1 not in self.action_mask:
+            self.is_dead_end = True
             self.action_mask[-1] = 1
 
         #self.action_mask.append(1)
@@ -256,6 +262,7 @@ class System():
         origin = transform.origin
 
         vec = point - origin
+        return vec
         vec = [vec.x,vec.y,vec.z]
 
         x = np.dot(vec , transform.x_base_l)
@@ -353,7 +360,7 @@ class System():
                 if distance < min_distance:
                     min_distance = distance
 
-        self.depth_map.append(min_distance/self.detection_distance)
+        self.depth_map.append(min_distance)
 
 
     def get_new_origin(self,transform,width,height,x_translation,y_translation):
@@ -379,6 +386,7 @@ class System():
         self.system_connectors = []     
         self.iteration = 0
         self.is_done = False
+        self.is_dead_end = False
         start_segmant = create_start_segmant(self.shape,self.width,self.height,1,self.radius_mul)
         self.system_segmants.append(start_segmant)
         self.system_connectors.append(start_segmant.movment_transform)
@@ -410,7 +418,6 @@ class System():
     def get_status(self,rect):
 
  
-        self.relative_direction_to_goal = self.transform_point(rect.origin,self.system_connectors[-1])
         self.min_rect_point = self.transform_point(rect.min,self.system_connectors[-1])
         self.max_rect_point = self.transform_point(rect.max,self.system_connectors[-1])
 

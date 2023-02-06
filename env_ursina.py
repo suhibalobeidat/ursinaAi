@@ -155,7 +155,7 @@ class Navigation_env():
             self.system.is_done = 0
             self.done = False
 
-        if self.layout.is_last_room:
+        if self.layout.is_last_room or self.system.is_dead_end:
             self.restart = True
 
 

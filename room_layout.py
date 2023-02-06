@@ -22,8 +22,8 @@ class Layout():
     def get_path_rects(self):
 
         for i in range(self.max_rooms_number-1):         
-            opening = self.rooms[i].openings[-1]
-            rect = create_rect(opening)
+            common_openings = self.rooms[i+1].common_openings[-1]
+            rect = create_rect(common_openings)
             self.path_rects.append(rect)
 
         self.next_rect = self.path_rects[0]
