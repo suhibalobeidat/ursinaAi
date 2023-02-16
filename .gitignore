@@ -7,5 +7,6 @@
 /runs
 /.venv
 /.gitignore
+/dist
 *out*
 del.py

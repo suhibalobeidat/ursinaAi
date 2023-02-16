@@ -1,7 +1,1 @@
-
-l = [1,1,1]
-
-if 0 not in l:
-    print("true")
-else:
-    print("false")
+pyinstaller -w --onefile --hidden-import msgpack --noconfirm --exclude-module colorful --clean

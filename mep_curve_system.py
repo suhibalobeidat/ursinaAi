@@ -199,6 +199,7 @@ class System():
 
     def get_action_mask(self):
         self.action_mask = []
+        dead_end_mask = []
         for i in range(2):
             if i == 0:
                 for k in range(2):
@@ -208,17 +209,19 @@ class System():
 
                         if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
+                            dead_end_mask.append(0)
                         else:
+                            self.action_mask.append(1)
                             if k == 0:#positive x
                                 if new_elbow_length >= self.depth_map[j+13]:
-                                    self.action_mask.append(0)
+                                    dead_end_mask.append(0)
                                 else:
-                                    self.action_mask.append(1)
+                                    dead_end_mask.append(1)
                             elif k == 1:#negative x
                                 if new_elbow_length >= self.depth_map[j+19]:
-                                    self.action_mask.append(0)
+                                    dead_end_mask.append(0)
                                 else:
-                                    self.action_mask.append(1)
+                                    dead_end_mask.append(1)
             else:
                 for k in range(2):
                     for j in range(len(self.angles)):
@@ -227,27 +230,29 @@ class System():
 
                         if self.system_segmants[-1].net_length - new_elbow_length < 0.01:
                             self.action_mask.append(0)
+                            dead_end_mask.append(0)
                         else:
+                            self.action_mask.append(1)
                             if k == 0:#positive y
                                 if new_elbow_length >= self.depth_map[j+7]:
-                                    self.action_mask.append(0)
+                                    dead_end_mask.append(0)
                                 else:
-                                    self.action_mask.append(1)
+                                    dead_end_mask.append(1)
                             elif k == 1:#negative y
                                 if new_elbow_length >= self.depth_map[j+1]:
-                                    self.action_mask.append(0)
+                                    dead_end_mask.append(0)
                                 else:
-                                    self.action_mask.append(1)
+                                    dead_end_mask.append(1)
 
         for straight_action in self.straight_segmant_action:
+            self.action_mask.append(1)
             if straight_action >= self.depth_map[0]:
-                self.action_mask.append(0)
+                dead_end_mask.append(0)
             else:
-                self.action_mask.append(1)
+                dead_end_mask.append(1)
 
-        if 1 not in self.action_mask:
+        if 1 not in dead_end_mask:
             self.is_dead_end = True
-            self.action_mask[-1] = 1
 
         #self.action_mask.append(1)
         #self.action_mask.append(1)
@@ -262,7 +267,6 @@ class System():
         origin = transform.origin
 
         vec = point - origin
-        return vec
         vec = [vec.x,vec.y,vec.z]
 
         x = np.dot(vec , transform.x_base_l)
