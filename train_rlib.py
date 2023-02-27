@@ -1,7 +1,7 @@
 from ray.tune.registry import register_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPO,CustomStopper,statManager,rlib_model_lstm
+from models import rlib_model,CustomStopper,statManager,rlib_model_lstm
 from gym_ursina import UrsinaGym
 from ray.rllib.algorithms.ppo.ppo import PPOConfig
 from gym.spaces import Dict
@@ -101,7 +101,7 @@ class Trainable(tune.Trainable):
                 "teacher_args":teacher_args,
                 "stat_manager":self.stat_manager}
 
-        config = PPOConfig(algo_class=MyPPO)
+        config = PPOConfig()
 
 
         config.train_batch_size = train_batch_size

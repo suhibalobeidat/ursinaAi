@@ -2,7 +2,7 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,MyPPO,CustomStopper,Teacher,rlib_model_lstm,statManager
+from models import rlib_model,CustomStopper,Teacher,rlib_model_lstm,statManager
 from gym_ursina import UrsinaGym
 import ray
 from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
@@ -93,7 +93,7 @@ class Trainable(tune.Trainable):
                 "teacher_args":teacher_args,
                 "stat_manager":None}
 
-        config = PPOConfig(algo_class=MyPPO)
+        config = PPOConfig(algo_class=PPO)
 
         """ curiosty_model_config = config.model.copy()
         curiosty_model_config["fcnet_hiddens"] = [512,512] """
@@ -127,7 +127,7 @@ class Trainable(tune.Trainable):
         config.restart_failed_sub_environments = True
         config.env_config.update(env_config)
         config.num_envs_per_worker = 7
-        config.num_workers = 1
+        config.num_rollout_workers = 1
         config.remote_worker_envs = True  
         config.num_gpus = 0.5         
         config.num_gpus_per_worker = 0.5 
@@ -150,8 +150,10 @@ class Trainable(tune.Trainable):
                                 "feature_net_config":curiosty_model_config,
                                 "sub_exploration":{"type":"StochasticSampling"}
                             }) """
-                            
+                       
         self.algo = config.build()
+        
+
 
     def step(self):
         return self.algo.train()
@@ -233,38 +235,11 @@ if __name__ == '__main__':
 
     #stat_manager.load_stat.remote()
 
-    """ tuner = tune.Tuner(
-            trainable_with_resources,
-            param_space=config,
-            tune_config=tune.TuneConfig(
-                mode="max",
-                metric="episode_reward_mean",
-                ),
-            run_config=RunConfig(
-                local_dir=r"C:\Users\sohai\ray_results\tensorboard",
-                name="Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,2",
-                verbose=3,
-                log_to_file=True,
-                failure_config=FailureConfig(
-                    max_failures=-1
-                    ),
-                checkpoint_config=CheckpointConfig(
-                    num_to_keep=1,
-                    checkpoint_at_end=True,
-                    checkpoint_frequency=1,
-                    checkpoint_score_attribute="episode_reward_mean"
-                    )
-            ),
-
-        )
-        
-    results = tuner.fit()     """
 
     result = tune.run(
+        resume=False,
         run_or_experiment=trainable_with_resources,
         config=config,
-        local_dir=r"C:\Users\sohai\ray_results\tensorboard",
-        name="Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,3",
         checkpoint_at_end=True,
         log_to_file=True,
         checkpoint_freq=1,

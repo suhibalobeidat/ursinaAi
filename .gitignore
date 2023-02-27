@@ -1,5 +1,4 @@
 /pytorch_models
-*.h5
 *.pyc
 *.pth
 *.log
@@ -7,6 +6,7 @@
 /runs
 /.venv
 /.gitignore
-/dist
 *out*
 del.py
+/build
+*.exe

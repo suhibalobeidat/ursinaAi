@@ -1,1 +1,1 @@
-pyinstaller -w --onefile --hidden-import msgpack --noconfirm --exclude-module colorful --clean
+pyinstaller -w --onefile --hidden-import msgpack --hidden-import setproctitle --noconfirm --exclude-module colorful --clean

@@ -16,7 +16,6 @@ from typing import List, Optional, Type, Union
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.models.torch.fcnet import FullyConnectedNetwork 
 from gym import spaces
-from ray.rllib.algorithms.ppo.my_ppo_torch_policy import MyPPOTorchPolicy
 from ray.rllib.models.torch.torch_action_dist import TorchCategorical
 from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from utils_ursina import correct_value
@@ -240,10 +239,6 @@ class rlib_model_lstm(TorchRNN,nn.Module):
     def value_function(self):
         return self.value_layer(self._features).squeeze(1)
 
-
-class MyPPO(PPO):
-    def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
-        return MyPPOTorchPolicy 
 
 
 

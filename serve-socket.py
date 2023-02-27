@@ -1,14 +1,16 @@
 import socket
 import numpy as np
-import threading
 import torch
-import torch.nn as nn   
-import torch.nn.functional as F
 import h5py
 from torch.distributions.categorical import Categorical
+import os
+
+from models import rlib_model
+print("hi")
+
 
 class Navigator:
-    def __init__(self, input_size,action_length,model_path,hidden_dim,obs_mean,obs_var):
+    def __init__(self, input_size,action_length,model_path,obs_mean,obs_var):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = load_model("model",model_path).to(self.device)
@@ -22,7 +24,7 @@ class Navigator:
         self.input_size = input_size
 
         self.host = "127.0.0.1"
-        self.port = 8000
+        self.port = 65212
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.host,self.port))  
@@ -48,10 +50,15 @@ class Navigator:
         return observation
 
     def step(self):
-        receivedData = self.connection.recv(9000).decode("UTF-8") #receiveing data in Byte fron C#, and converting it to String
-        receivedData = receivedData.split(",")
-        receivedData = [float(i) for i in receivedData]
-
+        try:
+            receivedData = self.connection.recv(9000).decode("UTF-8") #receiveing data in Byte fron C#, and converting it to String
+            receivedData = receivedData.split(",")
+            receivedData = [float(i) for i in receivedData]
+        except:
+            self.close()
+            self.terminate = True
+            return
+        
         if len(receivedData) == 1:
             self.close()
             self.terminate = True
@@ -84,13 +91,11 @@ def get_data_statistics(dir,file_name):
 
     return mean,var
 
-hidden_dim = 768
-model_path = r"C:\Users\sohai\Desktop\ursinaAi\dist"
-data_stat_dir = r"C:\Users\sohai\Desktop\ursinaAi\dist"
-data_stat = "data_stat.h5"
+model_path = os.path.abspath(os.getcwd())
+data_stat_dir = os.path.abspath(os.getcwd())
 
-obs_mean,obs_var = get_data_statistics(data_stat_dir,data_stat)
-navigator = Navigator(len(obs_mean),29,model_path,hidden_dim,obs_mean,obs_var)
+obs_mean,obs_var = get_data_statistics(data_stat_dir,"data_stat.h5")
+navigator = Navigator(len(obs_mean),29,model_path,obs_mean,obs_var)
 navigator.connect()
 
 while True:
