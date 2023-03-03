@@ -27,21 +27,24 @@ class Layout():
             self.path_rects.append(rect)
 
         self.next_rect = self.path_rects[0]
+        self.previous_rect = self.path_rects[0]
         self.current_room = self.rooms[0]
 
     def get_next_rect(self,segmant):
         if self.is_inside_last_room(segmant):
             self.is_last_room = True
-            return self.path_rects[-1], True
+            self.previous_rect = self.next_rect
+            return self.previous_rect,self.path_rects[-1], True
             
         
         if self.rooms[self.current_room.number].is_inside(segmant.movment_transform.origin):
+            self.previous_rect = self.next_rect
             self.next_rect = self.path_rects[self.current_room.number] 
             self.current_room = self.rooms[self.current_room.number]
 
-            return self.next_rect, True
+            return self.previous_rect,self.next_rect, True
         else:
-            return self.next_rect,False
+            return self.previous_rect,self.next_rect,False
 
             
 

@@ -6,7 +6,6 @@ from torch.distributions.categorical import Categorical
 import os
 
 from models import rlib_model
-print("hi")
 
 
 class Navigator:

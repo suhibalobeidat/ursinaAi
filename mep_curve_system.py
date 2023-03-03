@@ -17,6 +17,7 @@ class System():
         self.system_connectors = []
         self.depth_map = []
         self.action_mask = []
+        self.grounding_rays = []
         self.is_collide = False
         self.is_done = 0
         self.angles = [11.25,22.5,30,45,60,90]
@@ -27,10 +28,14 @@ class System():
         self.depth_map_yRange = 270
         self.depth_map_angle_offset = 15
         self.number_of_rays_per_axiss = 3
+        self.min_grounding_distance = from_mm_to_ft(300)
+        self.max_grounding_distance = from_mm_to_ft(500)
+        self.alignment_transform = None
 
         self.is_create_detection_system = True
         self._is_collision_detection = True
         self.is_dead_end = False
+
 
         self.iteration = 0
    
@@ -317,6 +322,7 @@ class System():
                     #line = draw_line(origin,origin + (direction*hit_info.distance))
                     #print(hit_info.distance)
         self.depth_map = depth_map """
+        self.grounding_rays = []
 
         for i in range(2):
             for angle in self.plane_angles:
@@ -364,6 +370,13 @@ class System():
                 if distance < min_distance:
                     min_distance = distance
 
+        if angle == 90 or angle == -90:
+            if rotation_axiss == RotationAxis.X:
+                self.grounding_rays.append(min_distance-self.height/2)
+            else:
+                self.grounding_rays.append(min_distance-self.width/2)
+
+
         self.depth_map.append(min_distance)
 
 
@@ -400,17 +413,32 @@ class System():
     def get_reward(self,is_new_room):
         if self.is_collide:
             reward = -100
+            return reward
         else:
             #distance = vec_len(self.relative_direction_to_goal)
             if is_new_room:
                 reward = 100
+
+                if self.segmant_rect_angle != 0:
+                    reward -= 50
+
+                if self.not_aligned:
+                    reward -= 5
+                
             else:
                 reward = -1#self.get_distance_reward(distance)
+
+                if self.not_aligned:
+                    reward -= 5
 
                 """ if self.current_angle != 0:
                     reward = -2#reward/2
                 else:
                     reward = -1 """
+        
+        if min(self.grounding_rays) < self.min_grounding_distance or min(self.grounding_rays) > self.max_grounding_distance:
+            reward -= 2.5
+
 
         #print("single agent reward", reward)
 
@@ -419,9 +447,28 @@ class System():
     def get_distance_reward(self,distance):
         return -math.pow(distance/10,0.7)
 
-    def get_status(self,rect):
+    def get_status(self,previous_rect,rect,is_new_room):
+        
+        self.target_vec_for_angle_clac = None
+        if(is_new_room):
+            self.segmant_rect_angle = angle_between_vec(self.system_connectors[-1].z_base,previous_rect.transform.z_base)
+            self.target_vec_for_angle_clac = previous_rect.transform.z_base
+        else:
+            self.segmant_rect_angle = angle_between_vec(self.system_connectors[-1].z_base,rect.transform.z_base)
+            self.target_vec_for_angle_clac = rect.transform.z_base
+        
+        if self.alignment_transform == None:
+            self.alignment_transform = Transform()#the system connectors will be checked for alignment with the y axis of the alignment transform 
 
+        self.angle_with_x_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].x_base))
+        self.angle_with_y_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].y_base))
+        self.angle_with_z_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].z_base))
  
+        if self.angle_with_x_axis != 0 and self.angle_with_x_axis != 180 and self.angle_with_y_axis != 0 and self.angle_with_y_axis != 180 and self.angle_with_z_axis != 0 and self.angle_with_z_axis != 180:
+            self.not_aligned = True
+        else:
+            self.not_aligned = False
+        
         self.min_rect_point = self.transform_point(rect.min,self.system_connectors[-1])
         self.max_rect_point = self.transform_point(rect.max,self.system_connectors[-1])
 
@@ -444,6 +491,16 @@ class System():
 
         state.append(self.width)#1
         state.append(self.height)#1
+
+        state.append(self.segmant_rect_angle)#35
+
+        state.extend(self.target_vec_for_angle_clac)#38
+        
+        state.extend(self.alignment_transform.y_base_l)#41
+
+        state.extend(self.system_connectors[-1].x_base_l)#44
+        state.extend(self.system_connectors[-1].y_base_l)#47
+        state.extend(self.system_connectors[-1].z_base_l)#50
 
         """ if len(self.system_segmants) == 1:
             state.append(self.system_segmants[-1].length)#1

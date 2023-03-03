@@ -96,7 +96,7 @@ class Trainable(tune.Trainable):
                 "obs_size":34,
                 "mask_size":29,
                 "min_size":75,
-                "max_size":250,
+                "max_size":100,
                 "is_teacher":False,
                 "teacher_args":teacher_args,
                 "stat_manager":self.stat_manager}

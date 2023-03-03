@@ -26,7 +26,7 @@ parser.add_argument('--critic_loss_coeff', type=float, default=0.5, help='Learni
 parser.add_argument('--entropy_coeff', type=float, default=0.01, help='Learning rate for discriminator')
 parser.add_argument('--bs', type=int, default=1000, help='Batch size')
 parser.add_argument('--ppo_epochs', type=int, default=5, help='Number of epochs')
-parser.add_argument('--text_input_length', type=int, default=34, help='406 Number of features in text input')
+parser.add_argument('--text_input_length', type=int, default=50, help='34 Number of features in text input')
 parser.add_argument('--depth_map_length', type=int, default=0, help='361 Number of features in text input')
 parser.add_argument('--action_direction_length', type=int, default=29, help='possible actions')
 parser.add_argument('--max_action_length', type=int, default=10, help='the max action length')
@@ -47,7 +47,7 @@ class Trainable(tune.Trainable):
 
         self.stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,3"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,4"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
 
         lr = float(config["lr"])
@@ -85,7 +85,7 @@ class Trainable(tune.Trainable):
         
 
         env_config = {
-                "obs_size":34,
+                "obs_size":args.text_input_length,
                 "mask_size":29,
                 "min_size":75,
                 "max_size":250,
@@ -159,7 +159,7 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,3"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,4"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     

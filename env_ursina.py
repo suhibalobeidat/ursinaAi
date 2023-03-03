@@ -74,7 +74,7 @@ class Navigation_env():
 
             total_status = []
 
-            total_status.extend(self.system.get_status(self.layout.next_rect))
+            total_status.extend(self.system.get_status(self.layout.previous_rect,self.layout.next_rect,False))
             total_status.extend(self.system.get_action_mask())
             self.done = False
             self.system.is_done = 0
@@ -84,7 +84,7 @@ class Navigation_env():
 
             return 
 
-        self.system.set_dim(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size),correct_value(goal[2],0,1,self.min_duct_size,self.max_duct_size))
+        self.system.set_dim(int(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size)),int(correct_value(goal[2],0,1,self.min_duct_size,self.max_duct_size)))
 
         self.system.reset()
         self.layout.reset()
@@ -102,7 +102,7 @@ class Navigation_env():
 
         total_status = []
 
-        total_status.extend(self.system.get_status(self.layout.next_rect))
+        total_status.extend(self.system.get_status(self.layout.previous_rect,self.layout.next_rect,False))
         total_status.extend(self.system.get_action_mask())
         self.done = False
         self.restart = False
@@ -128,10 +128,10 @@ class Navigation_env():
             if self.system.create_segmant(action[0],action[1]):
                 self.system.create_detection_system()
 
-        next_rect,is_new_room = self.layout.get_next_rect(self.system.system_segmants[-1])
+        previous_rect,next_rect,is_new_room = self.layout.get_next_rect(self.system.system_segmants[-1])
     
         total_status = []
-        total_status.extend(self.system.get_status(next_rect))
+        total_status.extend(self.system.get_status(previous_rect,next_rect,is_new_room))
 
         is_collide = False
         try:
