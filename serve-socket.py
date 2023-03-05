@@ -35,6 +35,8 @@ class Navigator:
         self.sock.listen()
         self.connection, self.id = self.sock.accept()
 
+        print("CONNECTED!")
+
     def close(self):
         self.connection.shutdown(socket.SHUT_RDWR) 
         self.connection.close()
@@ -49,18 +51,20 @@ class Navigator:
         return observation
 
     def step(self):
+        print("INSIDE STEP!!")
         try:
             receivedData = self.connection.recv(9000).decode("UTF-8") #receiveing data in Byte fron C#, and converting it to String
+            print("length of received data: ", len(receivedData))
             receivedData = receivedData.split(",")
             receivedData = [float(i) for i in receivedData]
         except:
-            self.close()
-            self.terminate = True
+            #self.close()
+            #self.terminate = True
             return
-        
+
         if len(receivedData) == 1:
-            self.close()
-            self.terminate = True
+            #self.close()
+            #self.terminate = True
             return
 
         obs = self.get_obs(receivedData)
@@ -71,6 +75,8 @@ class Navigator:
             action = action_dist.sample().item()
             value = self.policy.value_function().item()
 
+        print(obs["obs"].shape)
+        print("action",action)
         data = [action,value]
         data = ','.join(map(str, data)) #Converting List to a string, example "0,0,0"
         self.connection.sendall(data.encode("UTF-8")) #Converting string to Byte, and sending it to C#

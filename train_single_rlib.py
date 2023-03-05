@@ -2,7 +2,7 @@ from ray.tune.registry import register_env
 from gym_ursina import make_env
 import argparse
 from ray.rllib.models import ModelCatalog
-from models import rlib_model,CustomStopper,Teacher,rlib_model_lstm,statManager
+from models import rlib_model,CustomStopper,Teacher,rlib_model_lstm,statManager,MyPPO
 from gym_ursina import UrsinaGym
 import ray
 from ray.rllib.algorithms.ppo.ppo import PPO,PPOConfig
@@ -47,7 +47,7 @@ class Trainable(tune.Trainable):
 
         self.stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,4"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,5"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
 
         lr = float(config["lr"])
@@ -93,7 +93,7 @@ class Trainable(tune.Trainable):
                 "teacher_args":teacher_args,
                 "stat_manager":None}
 
-        config = PPOConfig(algo_class=PPO)
+        config = PPOConfig(algo_class=MyPPO)
 
         """ curiosty_model_config = config.model.copy()
         curiosty_model_config["fcnet_hiddens"] = [512,512] """
@@ -136,7 +136,7 @@ class Trainable(tune.Trainable):
         config.vf_clip_param = 10
 
         config.kl_coeff = 0
-        config.batch_mode = "complete_episodes"
+        #config.batch_mode = "complete_episodes"
         config.horizon = 100
         config.log_level = "WARN"#"INFO"
         config.create_env_on_local_worker = True
@@ -159,7 +159,7 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,4"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,5"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     
