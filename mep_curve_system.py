@@ -283,6 +283,18 @@ class System():
 
         return new_vec
 
+    def transform_vec(self,vec, transform):
+        
+        vec = [vec.x,vec.y,vec.z]
+
+        x = np.dot(vec , transform.x_base_l)
+        y = np.dot(vec , transform.y_base_l)
+        z = np.dot(vec , transform.z_base_l)
+
+        new_vec = Vec3(x,y,z)
+
+
+        return new_vec
     def check_for_collision(self):
 
         if not self._is_collision_detection:
@@ -415,7 +427,6 @@ class System():
             reward = -100
             return reward
         else:
-            #distance = vec_len(self.relative_direction_to_goal)
             if is_new_room:
                 reward = 100
 
@@ -426,18 +437,17 @@ class System():
                     reward -= 5
                 
             else:
-                reward = -1#self.get_distance_reward(distance)
+                reward = -1
 
                 if self.not_aligned:
                     reward -= 5
 
                 """ if self.current_angle != 0:
-                    reward = -2#reward/2
-                else:
                     reward = -1 """
+
         
-        if min(self.grounding_rays) < self.min_grounding_distance or min(self.grounding_rays) > self.max_grounding_distance:
-            reward -= 2.5
+        """ if min(self.grounding_rays) < self.min_grounding_distance or min(self.grounding_rays) > self.max_grounding_distance:
+            reward -= 5 """
 
 
         #print("single agent reward", reward)
@@ -492,87 +502,12 @@ class System():
         state.append(self.width)#1
         state.append(self.height)#1
 
-        state.append(self.segmant_rect_angle)#35
-
-        state.extend(self.target_vec_for_angle_clac)#38
+        self.target_vec_for_angle_clac = self.transform_vec(self.target_vec_for_angle_clac,self.system_connectors[-1])
+        state.extend(vec3_to_list(self.target_vec_for_angle_clac))#38
         
-        state.extend(self.alignment_transform.y_base_l)#41
+        self.alignment_vec = self.transform_vec(self.alignment_transform.y_base,self.system_connectors[-1])
+        state.extend(vec3_to_list(self.alignment_vec))#41
 
-        state.extend(self.system_connectors[-1].x_base_l)#44
-        state.extend(self.system_connectors[-1].y_base_l)#47
-        state.extend(self.system_connectors[-1].z_base_l)#50
-
-        """ if len(self.system_segmants) == 1:
-            state.append(self.system_segmants[-1].length)#1
-            state.append(0)#1
-            state.extend(vec3_to_list(z_base))#3
-            state.append(0)#1
-            state.extend(vec3_to_list(z_base))#3
-        elif len(self.system_segmants) == 2:
-            state.append(self.system_segmants[-1].length)
-            state.append(self.system_segmants[-2].length)
-            state.extend(vec3_to_list(self.system_connectors[-2].z_base)) 
-            state.append(0)
-            state.extend(vec3_to_list(self.system_connectors[-2].z_base)) 
-        else:
-            state.append(self.system_segmants[-1].length)
-            state.append(self.system_segmants[-2].length)
-            state.extend(vec3_to_list(self.system_connectors[-2].z_base)) 
-            state.append(self.system_segmants[-3].length)
-            state.extend(vec3_to_list(self.system_connectors[-3].z_base))    """
 
         return state
 
-    """ def get_reward(self):
-        if self.is_collide:
-            reward = -100
-        else:
-            distance = vec_len(self.relative_direction_to_goal)
-            if distance < self.max_distance_to_goal:
-                reward = 100
-
-            else:
-                reward = self.get_distance_reward(distance)
-   
-                if self.current_angle == 0:
-                    reward = reward/100
-
-        #print("single agent reward", reward)
-
-        return reward """
-    
-
-
-    """ def get_status(self):
-
- 
-        self.relative_direction_to_goal = self.transform_point(self.goal,self.system_connectors[-1])
-
-        x_base = self.system_connectors[-1].x_base
-        y_base = self.system_connectors[-1].y_base
-        z_base = self.system_connectors[-1].z_base
-
-        state = []
-
-        state.extend(self.depth_map)
-
-        state.extend(vec3_to_list(x_base))
-        state.extend(vec3_to_list(y_base))
-        state.extend(vec3_to_list(z_base))
-
-        state.append(self.system_segmants[-1].net_length)
-
-        state.extend(vec3_to_list(self.relative_direction_to_goal.normalized()))
-        state.append(vec3_len(self.relative_direction_to_goal))
-
-        state.append(self.width)
-        state.append(self.height)
-
-        #if len(self.system_segmants) == 1:
-        #    state.append(0)
-        #    state.extend(vec3_to_list(z_base))
-        #else:
-        #    state.append(self.system_segmants[-2].length)
-        #    state.extend(vec3_to_list(self.system_connectors[-2].z_base)) 
-
-        return state """

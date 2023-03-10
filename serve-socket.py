@@ -54,9 +54,9 @@ class Navigator:
         print("INSIDE STEP!!")
         try:
             receivedData = self.connection.recv(9000).decode("UTF-8") #receiveing data in Byte fron C#, and converting it to String
-            print("length of received data: ", len(receivedData))
             receivedData = receivedData.split(",")
             receivedData = [float(i) for i in receivedData]
+            print("length of received data: ", len(receivedData))
         except:
             #self.close()
             #self.terminate = True

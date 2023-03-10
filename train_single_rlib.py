@@ -26,7 +26,7 @@ parser.add_argument('--critic_loss_coeff', type=float, default=0.5, help='Learni
 parser.add_argument('--entropy_coeff', type=float, default=0.01, help='Learning rate for discriminator')
 parser.add_argument('--bs', type=int, default=1000, help='Batch size')
 parser.add_argument('--ppo_epochs', type=int, default=5, help='Number of epochs')
-parser.add_argument('--text_input_length', type=int, default=50, help='34 Number of features in text input')
+parser.add_argument('--text_input_length', type=int, default=40, help='34 Number of features in text input')
 parser.add_argument('--depth_map_length', type=int, default=0, help='361 Number of features in text input')
 parser.add_argument('--action_direction_length', type=int, default=29, help='possible actions')
 parser.add_argument('--max_action_length', type=int, default=10, help='the max action length')
@@ -47,7 +47,7 @@ class Trainable(tune.Trainable):
 
         self.stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,5"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,6"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
 
         lr = float(config["lr"])
@@ -87,13 +87,13 @@ class Trainable(tune.Trainable):
         env_config = {
                 "obs_size":args.text_input_length,
                 "mask_size":29,
-                "min_size":75,
-                "max_size":250,
+                "min_size":15,
+                "max_size":300,
                 "is_teacher":False,
                 "teacher_args":teacher_args,
                 "stat_manager":None}
 
-        config = PPOConfig(algo_class=MyPPO)
+        config = PPOConfig(algo_class=PPO)
 
         """ curiosty_model_config = config.model.copy()
         curiosty_model_config["fcnet_hiddens"] = [512,512] """
@@ -126,20 +126,22 @@ class Trainable(tune.Trainable):
         config.recreate_failed_workers= True
         config.restart_failed_sub_environments = True
         config.env_config.update(env_config)
-        config.num_envs_per_worker = 7
-        config.num_rollout_workers = 1
+        config.num_envs_per_worker = 6
+        config.num_rollout_workers = 2
         config.remote_worker_envs = True  
         config.num_gpus = 0.5         
-        config.num_gpus_per_worker = 0.5 
+        config.num_gpus_per_worker = 0.25 
         config.num_cpus_per_worker = config.num_envs_per_worker
         config.remote_env_batch_wait_ms = 4
         config.vf_clip_param = 10
 
         config.kl_coeff = 0
-        #config.batch_mode = "complete_episodes"
-        config.horizon = 100
+        config.batch_mode = "complete_episodes"
+        config.horizon = 50
+        #config.rollout_fragment_length = 50
+        config.no_done_at_end = True
         config.log_level = "WARN"#"INFO"
-        config.create_env_on_local_worker = True
+        config.create_env_on_local_worker = False
         if config.create_env_on_local_worker:
             config.num_cpus_for_local_worker = config.num_envs_per_worker
         config.evaluation_interval = None
@@ -159,7 +161,7 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,5"
+        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,6"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     
@@ -224,9 +226,9 @@ if __name__ == '__main__':
 
     trainable_with_resources  = tune.with_resources(
         tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
-            {"CPU": 7, "GPU": 0.5},
-            {"CPU":7, "GPU": 0.5},
-            {"CPU":1}
+            {"CPU":1, "GPU": 0.5},
+            {"CPU":7, "GPU": 0.25},
+            {"CPU":7, "GPU": 0.25},
         ]))  
     #stopper = CustomStopper()
 

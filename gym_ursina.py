@@ -111,6 +111,8 @@ class UrsinaGym(gym.Env):
         self.obs_var =  np.ones((obs_size,), "float64")
         self.ret_var = np.ones((), "float64")
 
+        
+
         self.epsilon=1e-4
         self.clipob = 10
         self.cliprew = 10

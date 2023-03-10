@@ -322,7 +322,7 @@ if __name__ == '__main__':
         )
     results = tuner.fit()    """
 
-    tune.run(resume="AUTO+RESTART_ERRORED",
+    tune.run(resume="AUTO",
     checkpoint_at_end=True,
     local_dir=r"C:\Users\sohai\ray_results",
     name="Trainable_2023-01-24_14-14-54",
