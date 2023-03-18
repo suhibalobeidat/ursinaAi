@@ -92,20 +92,20 @@ class System():
         elif action_direction == 25:
             action_length = 0.5
         elif action_direction == 26:
-            action_length = 1
+            action_length = 1.
         elif action_direction == 27:
-            action_length = 5
+            action_length = 5.
         elif action_direction == 28:
-            action_length = 10
+            action_length = 10.
         else:
             action_length = 0.01
 
         if action_length < 0.01:
             action_length = 0.01 
 
-        x_scaler = 0
-        y_scaler = 0
-        z_scaler = 0
+        x_scaler = 0.
+        y_scaler = 0.
+        z_scaler = 0.
         angle = 0
         movment_direction = MovmentDirection.Z
         new_segmant_length = action_length
@@ -166,6 +166,14 @@ class System():
 
             movment_direction = MovmentDirection.Z
 
+        if isinstance(x_scaler,np.float64):
+            x_scaler = x_scaler.item()
+
+        if isinstance(y_scaler,np.float64):
+            y_scaler = y_scaler.item()
+
+        if isinstance(z_scaler,np.float64):
+            z_scaler = z_scaler.item()
 
         x_translation = x_scaler * self.system_connectors[-1].x_base
         y_translation = y_scaler * self.system_connectors[-1].y_base
@@ -187,7 +195,7 @@ class System():
                 self.system_segmants[-1].angle,self.system_segmants[-1].relative_movement_direction,length,self.radius_mul)
             else:
                 length = new_segmant_length + self.system_segmants[-1].length
-                new_segmant = create_start_segmant(self.shape,self.width,self.height,length,self.radius_mul)
+                new_segmant = create_start_segmant(self.shape,self.width,self.height,length,0,0,self.system_segmants[-1],self.radius_mul)
                   
             destroy(self.system_segmants[-1])
             self.system_segmants.pop()
@@ -416,7 +424,7 @@ class System():
         self.iteration = 0
         self.is_done = False
         self.is_dead_end = False
-        start_segmant = create_start_segmant(self.shape,self.width,self.height,1,self.radius_mul)
+        start_segmant = create_start_segmant(self.shape,self.width,self.height,random.random()+0.01,random.random()*90,random.random()*90,radius_mul=self.radius_mul)
         self.system_segmants.append(start_segmant)
         self.system_connectors.append(start_segmant.movment_transform)
 

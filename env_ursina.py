@@ -27,7 +27,7 @@ class Navigation_env():
         self.receive_queue = receive_queue
         self.send_queue = send_queue
         self.radius_mul = 1
-        self.max_iteration = 60
+        self.max_iteration = 50
         self.max_room_number = 5
         self.actions = 29
         self.min_duct_size = min_size#mm

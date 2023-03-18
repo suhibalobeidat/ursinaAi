@@ -174,8 +174,8 @@ class Layout():
     def get_opening_size(self,wall):
         #return 5,5
         dim = max(self.mep_curve_segmant.width,self.mep_curve_segmant.height)
-        width = correct_value(self.opening_size,0,1,int(dim)+1,wall.width-1)#random.randint(int(dim)+1,wall.width-1)
-        height = correct_value(self.opening_size,0,1,int(dim)+1,wall.height-1)#random.randint(int(dim)+1,wall.height-1)
+        width = correct_value(self.opening_size,0,1,2*int(dim),wall.width-1)#random.randint(int(dim)+1,wall.width-1)
+        height = correct_value(self.opening_size,0,1,2*int(dim),wall.height-1)#random.randint(int(dim)+1,wall.height-1)
         return width,height
 
     def get_room_size(self):

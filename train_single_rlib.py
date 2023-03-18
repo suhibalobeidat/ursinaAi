@@ -47,7 +47,7 @@ class Trainable(tune.Trainable):
 
         self.stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
 
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,6"
+        dir = r"C:\Users\sohai\Desktop\data_stat\test"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
 
         lr = float(config["lr"])
@@ -93,7 +93,7 @@ class Trainable(tune.Trainable):
                 "teacher_args":teacher_args,
                 "stat_manager":None}
 
-        config = PPOConfig(algo_class=PPO)
+        config = PPOConfig(algo_class=MyPPO)
 
         """ curiosty_model_config = config.model.copy()
         curiosty_model_config["fcnet_hiddens"] = [512,512] """
@@ -126,9 +126,9 @@ class Trainable(tune.Trainable):
         config.recreate_failed_workers= True
         config.restart_failed_sub_environments = True
         config.env_config.update(env_config)
-        config.num_envs_per_worker = 6
-        config.num_rollout_workers = 2
-        config.remote_worker_envs = True  
+        config.num_envs_per_worker = 1#6
+        config.num_rollout_workers = 0#2
+        config.remote_worker_envs = False#True  
         config.num_gpus = 0.5         
         config.num_gpus_per_worker = 0.25 
         config.num_cpus_per_worker = config.num_envs_per_worker
@@ -138,10 +138,8 @@ class Trainable(tune.Trainable):
         config.kl_coeff = 0
         config.batch_mode = "complete_episodes"
         config.horizon = 50
-        #config.rollout_fragment_length = 50
-        config.no_done_at_end = True
         config.log_level = "WARN"#"INFO"
-        config.create_env_on_local_worker = False
+        config.create_env_on_local_worker = True#False
         if config.create_env_on_local_worker:
             config.num_cpus_for_local_worker = config.num_envs_per_worker
         config.evaluation_interval = None
@@ -161,7 +159,7 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        dir = r"C:\Users\sohai\Desktop\data_stat\Trainable_bde87636_5_clip_param=0.2825,entropy_coeff=0.0895,fcnet_activation=0.5979,fcnet_hiddens_layer_count=4.6484,gamma=0.8168,6"
+        dir = r"C:\Users\sohai\Desktop\data_stat\test"
         self.stat_manager.save_stat.remote(dir,"data_stat.h5")
         return self.algo.save_checkpoint(checkpoint_dir)
     

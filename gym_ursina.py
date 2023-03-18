@@ -96,11 +96,11 @@ class UrsinaGym(gym.Env):
         })
         self.action_space = spaces.Discrete(mask_size)
 
-        """ self.statManager = None
+        self.statManager = None
         if env_config["stat_manager"]:
-            self.statManager = env_config["stat_manager"] """
-        
-        self.statManager = ray.get_actor("statManager")
+            self.statManager = env_config["stat_manager"] 
+        else:
+            self.statManager = ray.get_actor("statManager")
 
         self.inner_env = InnerEnv(env_config)
 
