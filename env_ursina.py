@@ -92,7 +92,17 @@ class Navigation_env():
         self.system.reset()
         self.layout.reset()
 
-        self.layout.generate_layout(self.system.system_segmants[-1],goal[3])
+        successful_layout_generation = False
+
+        while not successful_layout_generation:
+            try:
+                self.layout.generate_layout(self.system.system_segmants[-1],goal[3])
+                successful_layout_generation = True
+
+            except:
+                self.layout.reset()
+                successful_layout_generation = False
+
         self.layout.get_path_rects()
 
         #goal_point = self.layout.get_goal_point(distance)

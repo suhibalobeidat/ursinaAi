@@ -57,7 +57,6 @@ class Trainable(tune.Trainable):
         num_sgd_iter = float(config["num_sgd_iter"])
         sgd_minibatch_size = float(config["sgd_minibatch_size"])
         clip_param = float(config["clip_param"])
-        vf_loss_coeff = 1#float(config["vf_loss_coeff"])
         entropy_coeff = float(config["entropy_coeff"])
         fcnet_hiddens_layer_count = float(config["fcnet_hiddens_layer_count"])
         layer_width = float(config["layer_width"])
@@ -73,16 +72,7 @@ class Trainable(tune.Trainable):
         hidden_layers = [layer_width]*fcnet_hiddens_layer_count
         
 
-        if fcnet_activation >= 0.5:
-            fcnet_activation = "relu"
-        else:
-            fcnet_activation = "tanh"
 
-        train_batch_size = round_to_multiple(train_batch_size,1000,"up")
-
-        if sgd_minibatch_size > train_batch_size:
-            sgd_minibatch_size = train_batch_size
-        
 
         env_config = {
                 "obs_size":args.text_input_length,
@@ -95,9 +85,6 @@ class Trainable(tune.Trainable):
 
         config = PPOConfig(algo_class=MyPPO)
 
-        """ curiosty_model_config = config.model.copy()
-        curiosty_model_config["fcnet_hiddens"] = [512,512] """
-
         config.train_batch_size = train_batch_size
         config.lr = lr
         config.grad_clip = grad_clip
@@ -106,11 +93,10 @@ class Trainable(tune.Trainable):
         config.num_sgd_iter = num_sgd_iter
         config.model["fcnet_hiddens"] = hidden_layers
         config.model["fcnet_activation"] = fcnet_activation
-        config.vf_loss_coeff = vf_loss_coeff
+        config.vf_loss_coeff = 1
         config.entropy_coeff = entropy_coeff
         config.lambda_ = lambda_
         config.gamma = gamma
-        #config.model["max_seq_len"] = 20
 
         config.model["custom_model"] = rlib_model
         config.model["custom_model_config"] = {"obs":args.text_input_length,
@@ -144,13 +130,6 @@ class Trainable(tune.Trainable):
             config.num_cpus_for_local_worker = config.num_envs_per_worker
         config.evaluation_interval = None
 
-        """ config.exploration(explore=True,
-                            exploration_config={
-                                "type":"Curiosity",
-                                "feature_net_config":curiosty_model_config,
-                                "sub_exploration":{"type":"StochasticSampling"}
-                            }) """
-                       
         self.algo = config.build()
         
 
@@ -179,48 +158,20 @@ if __name__ == '__main__':
     teacher_args = get_args()
 
     config = {
-        "clip_param": 0.2824546930536148,
-        "entropy_coeff": 0.08949325230772212,
-        "fcnet_activation": 0.5978999788110851,
-        "fcnet_hiddens_layer_count": 4.6484340576040255,
-        "gamma": 0.8168135753898648,
-        "grad_clip": 0.19678687955672605,
-        "lambda_": 0.9522613644455269,
-        "layer_width": 672.2500909421042,
-        "lr": 7.834678064820692e-05,
-        "num_sgd_iter": 10.426980635477918,
-        "sgd_minibatch_size": 16585.88224494371,
-        "train_batch_size": 7794.394374010856,
-        #"vf_loss_coeff": 0.2816535751776934
+        "clip_param": 0.3,
+        "entropy_coeff": 0.01,
+        "fcnet_activation": "tanh",
+        "fcnet_hiddens_layer_count": 3,
+        "gamma": 0.99,
+        "grad_clip": 0.7,
+        "lambda_": 0.9,
+        "layer_width": 1000,
+        "lr": 1.57e-3,
+        "num_sgd_iter": 5,
+        "sgd_minibatch_size": 11000,
+        "train_batch_size": 23000,
     } 
 
-    """ config = {
-    "clip_param": 0.176192007866709,
-    "entropy_coeff": 0.006033957647477133,
-    "fcnet_activation": 0.595773002166077,
-    "fcnet_hiddens_layer_count": 1.7777498316417781,
-    "gamma": 0.9541755115840513,
-    "grad_clip": 0.2512786625817104,
-    "lambda_": 0.9531417614596301,
-    "layer_width": 1041.6393734105818,
-    "lr": 7.201914539290346e-05,
-    "num_sgd_iter": 26.105040824428173,
-    "sgd_minibatch_size": 18023.642141369033,
-    "train_batch_size": 10096.024045377108,
-    "vf_loss_coeff": 0.5135697404733504
-    } """
-
-    """ trainable_with_resources  = tune.with_resources(
-        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
-            {"CPU": 1, "GPU": 0.25},
-            {"CPU":4, "GPU": 0.25},
-            {"CPU":4, "GPU": 0.25},
-            {"CPU":4, "GPU": 0.25}
-        ]))   """
-    """ trainable_with_resources  = tune.with_resources(
-        tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
-            {"CPU": 13, "GPU": 1}
-        ]))  """
 
     trainable_with_resources  = tune.with_resources(
         tune.with_parameters(Trainable,teacher_args=teacher_args),tune.PlacementGroupFactory([
@@ -228,12 +179,6 @@ if __name__ == '__main__':
             {"CPU":7, "GPU": 0.25},
             {"CPU":7, "GPU": 0.25},
         ]))  
-    #stopper = CustomStopper()
-
-    #teacher = Teacher.options(name="teacher").remote(teacher_args)
-    #stat_manager = statManager.options(name="statManager").remote((args.text_input_length,))
-
-    #stat_manager.load_stat.remote()
 
 
     result = tune.run(

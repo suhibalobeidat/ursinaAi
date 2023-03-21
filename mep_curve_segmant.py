@@ -76,9 +76,6 @@ def create_start_segmant(shape, width, height,length,x_angle,y_angle,current_seg
         y_axis = Vec3(y_axis.x,y_axis.y,y_axis.z)
         z_axis = Vec3(z_axis.x,z_axis.y,z_axis.z)
 
-        print("very first - x_axis ", x_axis)
-        print("very first - y_axis ", y_axis)
-        print("very first - z_axis ", z_axis)
 
     else:
         start_position = current_segmant.start_position
@@ -88,9 +85,6 @@ def create_start_segmant(shape, width, height,length,x_angle,y_angle,current_seg
         y_axis = current_segmant.y_axis
         z_axis = current_segmant.z_axis
 
-        print("first - x_axis ", x_axis)
-        print("first - y_axis ", y_axis)
-        print("first - z_axis ", z_axis)
 
         start_segmant = Segmant(shape = shape, start_position = start_position,end_position = end_position,width = width,height = height,parent_segmant=None,segmant_count=1,angle = 0,relative_movement_direction = MovmentDirection.Z,x_axis=x_axis,y_axis=y_axis,z_axis=z_axis,length=length,radius_mul=radius_mul)
 

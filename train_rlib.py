@@ -74,7 +74,7 @@ class Trainable(tune.Trainable):
 
         num_sgd_iter = int(num_sgd_iter)
         #max_seq_len = round_to_multiple(max_seq_len,1,"up")
-        #sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,128,"up")
+        sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,1000,"up")
         #clip_param = round_to_multiple(clip_param, 0.1,"up")
         #fcnet_hiddens_layer_count = round_to_multiple(fcnet_hiddens_layer_count,1,"up")
         #layer_width = round_to_multiple(layer_width,128,"up")
@@ -87,7 +87,7 @@ class Trainable(tune.Trainable):
         #else:
         #    fcnet_activation = "tanh"
 
-        #train_batch_size = round_to_multiple(train_batch_size,1000,"up")
+        train_batch_size = round_to_multiple(train_batch_size,1000,"up")
 
         if sgd_minibatch_size > train_batch_size:
             sgd_minibatch_size = train_batch_size
@@ -145,7 +145,6 @@ class Trainable(tune.Trainable):
 
         config.batch_mode = "complete_episodes"
         config.horizon = 50
-        config.no_done_at_end = True
         config.log_level = "WARN"#"INFO"
         config.create_env_on_local_worker = True
 
@@ -224,8 +223,8 @@ if __name__ == '__main__':
     config = {
             "lr":tune.uniform(1e-5,1e-2),
             "num_sgd_iter":tune.uniform(3,15),
-            "train_batch_size":tune.uniform(10000,50000),
-            "sgd_minibatch_size":tune.uniform(10000,50000),
+            "train_batch_size":tune.uniform(10000,25000),
+            "sgd_minibatch_size":tune.uniform(10000,25000),
             }  
     #"max_seq_len":tune.uniform(0.5,20),
     #"lstm_state_size":tune.uniform(32,1000)
@@ -325,8 +324,8 @@ if __name__ == '__main__':
 
     tune.run(resume="AUTO",
     checkpoint_at_end=True,
-    local_dir=r"C:\Users\sohai\ray_results",
-    name="Trainable_2023-03-15_22-30-52",
+    #local_dir=r"C:\Users\sohai\ray_results",
+    #name="Trainable_2023-03-20_02-39-28",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,

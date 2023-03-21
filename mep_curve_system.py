@@ -438,7 +438,8 @@ class System():
             if is_new_room:
                 reward = 100
 
-                if self.segmant_rect_angle != 0:
+                #if self.segmant_rect_angle != 0:
+                if self.segmant_rect_angle > 5:
                     reward -= 50
 
                 if self.not_aligned:
