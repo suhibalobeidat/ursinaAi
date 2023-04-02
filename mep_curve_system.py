@@ -24,6 +24,11 @@ class System():
         self.plane_angles = [0, -11.25, -22.5, -30, -45, -60, -90, 11.25, 22.5, 30, 45, 60, 90]
         self.straight_segmant_action = [0.1,0.5,1,5,10]
 
+        self.x_angle = 0
+        self.y_angle = 0
+
+        self.start_angles = [0,90,45,60,30,22.5,11.25]
+
         self.depth_map_xRange = 270
         self.depth_map_yRange = 270
         self.depth_map_angle_offset = 15
@@ -166,6 +171,9 @@ class System():
 
             movment_direction = MovmentDirection.Z
 
+        if movment_direction != MovmentDirection.Z:
+            self.restore_alignment_axis = movment_direction
+
         if isinstance(x_scaler,np.float64):
             x_scaler = x_scaler.item()
 
@@ -275,6 +283,16 @@ class System():
 
         return self.action_mask
 
+    def get_alignment_mask(self):
+
+        if self.not_aligned:
+            mask = [0]*12
+
+            if self.restore_alignment_axis == MovmentDirection.X:
+                self.action_mask[12:24] = mask
+            elif self.restore_alignment_axis == MovmentDirection.Y:
+                self.action_mask[:12] = mask
+            
     def transform_point(self,point, transform):
         
         origin = transform.origin
@@ -424,7 +442,23 @@ class System():
         self.iteration = 0
         self.is_done = False
         self.is_dead_end = False
-        start_segmant = create_start_segmant(self.shape,self.width,self.height,random.random()+0.01,random.random()*90,random.random()*90,radius_mul=self.radius_mul)
+
+        self.x_angle = 0
+        self.y_angle = 0
+
+        self.restore_alignment_axis = None
+
+
+        if random.randint(0,1) == 0:
+            self.x_angle = self.start_angles[random.randint(0,len(self.start_angles)-1)]
+        else:
+            self.y_angle = self.start_angles[random.randint(2,len(self.start_angles)-1)]
+            if self.y_angle != 0 and self.y_angle != 90:
+                self.restore_alignment_axis = MovmentDirection.Y
+
+        length = 1#random.random()+0.01
+
+        start_segmant = create_start_segmant(self.shape,self.width,self.height,length,self.x_angle,self.y_angle,radius_mul=self.radius_mul)
         self.system_segmants.append(start_segmant)
         self.system_connectors.append(start_segmant.movment_transform)
 
@@ -436,14 +470,13 @@ class System():
             return reward
         else:
             if is_new_room:
-                reward = 100
-
-                #if self.segmant_rect_angle != 0:
-                if self.segmant_rect_angle > 5:
-                    reward -= 50
-
                 if self.not_aligned:
-                    reward -= 5
+                    reward = -50
+                    return reward
+                
+                reward = 100
+                if round(self.segmant_rect_angle,1) != 0:
+                    reward -= 50
                 
             else:
                 reward = -1
@@ -476,12 +509,14 @@ class System():
             self.segmant_rect_angle = angle_between_vec(self.system_connectors[-1].z_base,rect.transform.z_base)
             self.target_vec_for_angle_clac = rect.transform.z_base
         
+        self.segmant_rect_angle = rad_to_deg(self.segmant_rect_angle)
+
         if self.alignment_transform == None:
             self.alignment_transform = Transform()#the system connectors will be checked for alignment with the y axis of the alignment transform 
 
-        self.angle_with_x_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].x_base))
-        self.angle_with_y_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].y_base))
-        self.angle_with_z_axis = rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].z_base))
+        self.angle_with_x_axis = round(rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].x_base)),1)
+        self.angle_with_y_axis = round(rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].y_base)),1)
+        self.angle_with_z_axis = round(rad_to_deg(angle_between_vec(self.alignment_transform.y_base,self.system_connectors[-1].z_base)),1)
  
         if self.angle_with_x_axis != 0 and self.angle_with_x_axis != 180 and self.angle_with_y_axis != 0 and self.angle_with_y_axis != 180 and self.angle_with_z_axis != 0 and self.angle_with_z_axis != 180:
             self.not_aligned = True

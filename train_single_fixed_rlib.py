@@ -41,6 +41,7 @@ parser.add_argument('--parallel_workers_test', type=int, default=1, help='number
 parser.add_argument('--parallel_workers', type=int, default=2, help='number of parallel agents')
 parser.add_argument('--envs_per_worker', type=int, default=2, help='number of parallel agents')
 parser.add_argument('--sageMaker', type=bool, default=False, help='number of parallel agents')
+parser.add_argument('--is_teacher', type=bool, default=False, help='number of parallel agents')
 
 class Trainable(tune.Trainable):
     def setup(self, config,teacher_args=None):
@@ -54,24 +55,15 @@ class Trainable(tune.Trainable):
         lambda_ = float(config["lambda_"])
         gamma = float(config["gamma"])
         grad_clip = float(config["grad_clip"])
-        num_sgd_iter = float(config["num_sgd_iter"])
-        sgd_minibatch_size = float(config["sgd_minibatch_size"])
+        num_sgd_iter = int(config["num_sgd_iter"])
         clip_param = float(config["clip_param"])
         entropy_coeff = float(config["entropy_coeff"])
-        fcnet_hiddens_layer_count = float(config["fcnet_hiddens_layer_count"])
-        layer_width = float(config["layer_width"])
-        fcnet_activation = float(config["fcnet_activation"])
-        train_batch_size = float(config["train_batch_size"])
-        
-        
-        num_sgd_iter = int(num_sgd_iter)
-        sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,128,"up")
-        clip_param = round_to_multiple(clip_param, 0.1,"up")
-        fcnet_hiddens_layer_count = round_to_multiple(fcnet_hiddens_layer_count,1,"up")
-        layer_width = round_to_multiple(layer_width,128,"up")
+        train_batch_size = int(config["train_batch_size"])
+        sgd_minibatch_size = int(config["sgd_minibatch_size"])
+        fcnet_hiddens_layer_count = int(config["fcnet_hiddens_layer_count"])
+        layer_width = int(config["layer_width"])
         hidden_layers = [layer_width]*fcnet_hiddens_layer_count
-        
-
+        fcnet_activation = config["fcnet_activation"]
 
 
         env_config = {
@@ -79,7 +71,7 @@ class Trainable(tune.Trainable):
                 "mask_size":29,
                 "min_size":15,
                 "max_size":300,
-                "is_teacher":False,
+                "is_teacher":args.is_teacher,
                 "teacher_args":teacher_args,
                 "stat_manager":None}
 
@@ -180,9 +172,13 @@ if __name__ == '__main__':
             {"CPU":7, "GPU": 0.25},
         ]))  
 
+    if args.is_teacher:
+        teacher = Teacher.options(name="teacher").remote(teacher_args)
 
     result = tune.run(
-        resume=False,
+        resume="AUTO",
+        local_dir=r"C:\Users\sohai\ray_results",
+        name="Trainable_2023-03-28_14-39-53",
         run_or_experiment=trainable_with_resources,
         config=config,
         checkpoint_at_end=True,

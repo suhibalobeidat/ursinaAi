@@ -38,6 +38,7 @@ class Commands(enum.Enum):
    done = 4
    clear = 5
    close = 6
+   is_new_layout = 7
 
 
 class ActionSpace(enum.Enum):

@@ -29,13 +29,15 @@ class InnerEnv(gym.Env):
 
 
     def reset(self,**kwargs):
-
-        if self.is_teacher:
+        
+        self.is_new_layout = self.env.is_new_layout()
+        if self.is_teacher and self.is_new_layout:
             self.params = ray.get(self.teacher.get_env_params.remote())
             self.teacher_ret = 0
             self.steps = 0
+            self.is_new_layout = True
         else:
-            self.params = np.array([random.random() for i in range(3)])
+            self.params = np.array([random.random() for i in range(2)])
 
         receivedData = self.env.reset(self.params)
         observation = np.array(receivedData[:len(receivedData)-self.mask_size],dtype=np.float32)
@@ -69,11 +71,12 @@ class InnerEnv(gym.Env):
 
 
         if self.is_teacher:
-            gamma = pow(0.99,self.steps)
-            self.teacher_ret += gamma * reward
-            self.steps +=1
-            if terminated or truncated:
-                self.teacher.record_train_episode.remote(self.teacher_ret, 0,self.params)
+            if self.is_new_layout:
+                gamma = pow(0.99,self.steps)
+                self.teacher_ret += gamma * (reward/100)
+                self.steps +=1
+                if terminated or truncated:
+                    self.teacher.record_train_episode.remote(self.teacher_ret, 0,self.params)
 
         info = {"truncated":truncated,"action_mask":action_mask}
 

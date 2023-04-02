@@ -48,10 +48,7 @@ class Navigation_env():
 
 
     def reset(self, goal):
-        #distance = correct_value(goal[0],0,1,self.min_distance,self.max_distance)
         
-        #goal_point = get_point_at_distance(distance)
-
         if not self.restart:
 
             last_segmant = self.system.system_segmants.pop()
@@ -84,10 +81,10 @@ class Navigation_env():
 
             return 
         
-        self.system.set_dim(int(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size)),int(correct_value(goal[2],0,1,self.min_duct_size,self.max_duct_size)))
+        self.system.set_dim(int(correct_value(goal[0],0,1,self.min_duct_size,self.max_duct_size)),int(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size)))
 
-        #dim = int(correct_value(goal[1],0,1,self.min_duct_size,self.max_duct_size))
-        #self.system.set_dim(dim, dim)
+        self.system.x_angle = self.system.start_angles[int(correct_value(goal[2],0,1,0,len(self.system.start_angles)-1))]
+        self.system.y_angle = self.system.start_angles[int(correct_value(goal[3],0,1,0,len(self.system.start_angles)-1))]
 
         self.system.reset()
         self.layout.reset()
@@ -214,7 +211,8 @@ class Navigation_env():
             self.clear()
         elif Commands(command) == Commands.close:
             self.close()
-
+        elif Commands(command) == Commands.is_new_layout:
+            self.send_queue.put([self.restart])   
 
 class MyQueue():
     def __init__(self):
@@ -261,12 +259,22 @@ class env_interface():
         received_data = self.receive_queue.get()
 
         return received_data[0]
+    
+    def is_new_layout(self):
+        data = []
+        data.append(7.)
+        self.send_queue.put(data)
+        if self.same_process:
+            self.app.step()
+        received_data = self.receive_queue.get() 
+        return received_data[0]
 
     def reset(self,goal):
 
         data = []
         data.append(1.)
-        data.append(20.)
+        dims = self.params = np.array([random.random() for i in range(2)])
+        data.extend(dims)
         data.extend(goal)
 
         self.send_queue.put(data)

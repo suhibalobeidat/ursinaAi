@@ -49,43 +49,40 @@ class Trainable(tune.Trainable):
         self.stat_manager = statManager.remote((args.text_input_length,))
 
 
-        """ fcnet_activation = 0.1823053454576449
-        fcnet_hiddens_layer_count= 2.0
-        layer_width= 738.0168809379319 """
-
         lstm_state_size = 256
         #wait_for_gpu(target_util=0.75)
     
         lr = float(config["lr"])#4e-4
-        lambda_ = 0.9#float(config["lambda_"])
-        gamma = 0.99#float(config["gamma"])
-        grad_clip = 0.7#float(config["grad_clip"])
+        lambda_ = float(config["lambda_"])
+        gamma = float(config["gamma"])
+        grad_clip = float(config["grad_clip"])
         num_sgd_iter = float(config["num_sgd_iter"])#7
         sgd_minibatch_size = float(config["sgd_minibatch_size"])#10000
-        clip_param = 0.3#float(config["clip_param"])
+        clip_param = float(config["clip_param"])
         vf_loss_coeff = 1#float(config["vf_loss_coeff"])
-        entropy_coeff = 0.01#float(config["entropy_coeff"])
-        fcnet_hiddens_layer_count = 3#float(config["fcnet_hiddens_layer_count"])
-        layer_width = 1000#float(config["layer_width"])
-        #fcnet_activation = float(config["fcnet_activation"])
+        entropy_coeff = float(config["entropy_coeff"])
+        fcnet_hiddens_layer_count = float(config["fcnet_hiddens_layer_count"])
+        layer_width = float(config["layer_width"])
+        fcnet_activation = float(config["fcnet_activation"])
         train_batch_size = float(config["train_batch_size"])#10000
         #max_seq_len = float(config["max_seq_len"])
         #lstm_state_size = float(config["lstm_state_size"])
 
-        num_sgd_iter = int(num_sgd_iter)
         #max_seq_len = round_to_multiple(max_seq_len,1,"up")
-        sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,1000,"up")
-        #clip_param = round_to_multiple(clip_param, 0.1,"up")
-        #fcnet_hiddens_layer_count = round_to_multiple(fcnet_hiddens_layer_count,1,"up")
-        #layer_width = round_to_multiple(layer_width,128,"up")
         #lstm_state_size = round_to_multiple(layer_width,128,"up")
+
+        num_sgd_iter = int(num_sgd_iter)
+        sgd_minibatch_size = round_to_multiple(sgd_minibatch_size,1000,"up")
+        clip_param = round_to_multiple(clip_param, 0.1,"up")
+        fcnet_hiddens_layer_count = round_to_multiple(fcnet_hiddens_layer_count,1,"up")
+        layer_width = round_to_multiple(layer_width,128,"up")
         hidden_layers = [layer_width]*fcnet_hiddens_layer_count
         
 
-        #if fcnet_activation >= 0.5:
-        fcnet_activation = "tanh"
-        #else:
-        #    fcnet_activation = "tanh"
+        if fcnet_activation >= 0.5:
+            fcnet_activation = "relu"
+        else:
+            fcnet_activation = "tanh"
 
         train_batch_size = round_to_multiple(train_batch_size,1000,"up")
 
@@ -205,27 +202,27 @@ if __name__ == '__main__':
     #teacher = Teacher.options(name="teacher").remote(teacher_args)
 
 
-    """ config = {"lr":tune.uniform(1e-6,1e-3),
-            "num_sgd_iter":tune.uniform(5,60),
-            "sgd_minibatch_size":tune.uniform(65,20000),
-            "clip_param":tune.uniform(0.01,0.3),
-            "entropy_coeff":tune.uniform(0.0001,0.1),
+    config = {"lr":tune.uniform(1e-6,1e-2),
+            "num_sgd_iter":tune.uniform(5,15),
+            "sgd_minibatch_size":tune.uniform(5000,20000),
+            "clip_param":tune.uniform(0.01,0.5),
+            "entropy_coeff":tune.uniform(0.01,0.1),
             "layer_width":tune.uniform(32,2000),
-            "vf_loss_coeff":tune.uniform(0.001,1),
+            #"vf_loss_coeff":tune.uniform(0.001,1),
             "fcnet_hiddens_layer_count":tune.uniform(0.5,5),
             "fcnet_activation":tune.uniform(0,1),
-            "train_batch_size":tune.uniform(1025,20000),
+            "train_batch_size":tune.uniform(5000,20000),
             "grad_clip":tune.uniform(0.001,1),
-            "lambda_":tune.uniform(0.95,1),
+            "lambda_":tune.uniform(0.8,1),
             "gamma":tune.uniform(0.8,0.99),
 
-            }  """
-    config = {
+            }  
+    """ config = {
             "lr":tune.uniform(1e-5,1e-2),
             "num_sgd_iter":tune.uniform(3,15),
             "train_batch_size":tune.uniform(10000,25000),
             "sgd_minibatch_size":tune.uniform(10000,25000),
-            }  
+            }   """
     #"max_seq_len":tune.uniform(0.5,20),
     #"lstm_state_size":tune.uniform(32,1000)
 
@@ -285,7 +282,7 @@ if __name__ == '__main__':
 
 
     search_alg=BayesOptSearch(
-            random_search_steps=10
+            random_search_steps=15
             )
 
     scheduler=AsyncHyperBandScheduler(
@@ -324,8 +321,8 @@ if __name__ == '__main__':
 
     tune.run(resume="AUTO",
     checkpoint_at_end=True,
-    #local_dir=r"C:\Users\sohai\ray_results",
-    #name="Trainable_2023-03-20_02-39-28",
+    local_dir=r"C:\Users\sohai\ray_results",
+    name="Trainable_2023-03-25_00-55-30",
     run_or_experiment=trainable_with_resources,
     config=config,
     checkpoint_freq=1,

@@ -51,7 +51,7 @@ def get_teacher(args):
 
     param_env_bounds = OrderedDict()
 
-    param_env_bounds['total_distance'] = [0,1,3]
+    param_env_bounds['total_distance'] = [0,1,2]
 
     Teacher = TeacherController(args.teacher, args.nb_test_episodes, param_env_bounds,
                                 seed=args.seed, teacher_params=params)

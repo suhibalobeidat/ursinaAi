@@ -97,7 +97,7 @@ class TeacherController(object):
         #param_dict = param_vec_to_param_dict(self.param_env_bounds, params)
 
         if self.teacher != 'Oracle':
-            reward = np.interp(reward, (-5, 5), (0, 1))
+            reward = np.interp(reward, (-7, 1), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.task_generator.update(env_params, reward)
 
