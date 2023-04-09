@@ -314,10 +314,11 @@ class statManager:
 
         self.obs_stat.obs_rms.mean = np.array(file["/obs_mean"]).astype("float32")
         self.obs_stat.obs_rms.var = np.array(file["/obs_var"]).astype("float32")
-        self.obs_stat.obs_rms.count = 1000
+        self.obs_stat.obs_rms.count = 1000000
 
-        #self.rews_stat.return_rms.mean = np.array(file["/ret_mean"]).astype("float32")
-        #self.rews_stat.return_rms.var = np.array(file["/ret_var"]).astype("float32")
+        self.rews_stat.return_rms.mean = np.array(file["/ret_mean"]).astype("float32")
+        self.rews_stat.return_rms.var = np.array(file["/ret_var"]).astype("float32")
+        self.rews_stat.return_rms.count = 1000000
 
 
 class NormalizeObservation():

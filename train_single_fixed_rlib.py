@@ -26,7 +26,7 @@ parser.add_argument('--critic_loss_coeff', type=float, default=0.5, help='Learni
 parser.add_argument('--entropy_coeff', type=float, default=0.01, help='Learning rate for discriminator')
 parser.add_argument('--bs', type=int, default=1000, help='Batch size')
 parser.add_argument('--ppo_epochs', type=int, default=5, help='Number of epochs')
-parser.add_argument('--text_input_length', type=int, default=40, help='34 Number of features in text input')
+parser.add_argument('--text_input_length', type=int, default=45, help='34 Number of features in text input')
 parser.add_argument('--depth_map_length', type=int, default=0, help='361 Number of features in text input')
 parser.add_argument('--action_direction_length', type=int, default=29, help='possible actions')
 parser.add_argument('--max_action_length', type=int, default=10, help='the max action length')
@@ -135,6 +135,7 @@ class Trainable(tune.Trainable):
         return self.algo.save_checkpoint(checkpoint_dir)
     
     def load_checkpoint(self, checkpoint: Union[Dict, str]):
+        self.stat_manager.load_stat.remote()
         return self.algo.load_checkpoint(checkpoint)
 
 
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     result = tune.run(
         resume="AUTO",
         local_dir=r"C:\Users\sohai\ray_results",
-        name="Trainable_2023-03-28_14-39-53",
+        name="Trainable_2023-04-04_18-55-31",
         run_or_experiment=trainable_with_resources,
         config=config,
         checkpoint_at_end=True,

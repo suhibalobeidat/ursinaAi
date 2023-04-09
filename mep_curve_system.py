@@ -29,6 +29,9 @@ class System():
 
         self.start_angles = [0,90,45,60,30,22.5,11.25]
 
+        self.restore_alignment_axis = None
+
+
         self.depth_map_xRange = 270
         self.depth_map_yRange = 270
         self.depth_map_angle_offset = 15
@@ -446,17 +449,18 @@ class System():
         self.x_angle = 0
         self.y_angle = 0
 
-        self.restore_alignment_axis = None
 
 
         if random.randint(0,1) == 0:
-            self.x_angle = self.start_angles[random.randint(0,len(self.start_angles)-1)]
+            self.x_angle = self.start_angles[random.randint(0,1)]
         else:
-            self.y_angle = self.start_angles[random.randint(2,len(self.start_angles)-1)]
+            self.y_angle = self.start_angles[random.randint(0,1)]
             if self.y_angle != 0 and self.y_angle != 90:
                 self.restore_alignment_axis = MovmentDirection.Y
 
-        length = 1#random.random()+0.01
+        length = random.random()+0.01
+
+        self.max_grounding_distance = from_mm_to_ft(random.randint(300,1000))
 
         start_segmant = create_start_segmant(self.shape,self.width,self.height,length,self.x_angle,self.y_angle,radius_mul=self.radius_mul)
         self.system_segmants.append(start_segmant)
@@ -470,13 +474,13 @@ class System():
             return reward
         else:
             if is_new_room:
-                if self.not_aligned:
-                    reward = -50
-                    return reward
-                
-                reward = 100
+
                 if round(self.segmant_rect_angle,1) != 0:
-                    reward -= 50
+                    reward = 20
+                    return reward
+                else:
+                    reward = 100
+                    return reward
                 
             else:
                 reward = -1
@@ -490,7 +494,8 @@ class System():
         
         """ if min(self.grounding_rays) < self.min_grounding_distance or min(self.grounding_rays) > self.max_grounding_distance:
             reward -= 5 """
-
+        if min(self.grounding_rays) > self.max_grounding_distance:
+            reward -= 10 
 
         #print("single agent reward", reward)
 
@@ -552,6 +557,8 @@ class System():
         self.alignment_vec = self.transform_vec(self.alignment_transform.y_base,self.system_connectors[-1])
         state.extend(vec3_to_list(self.alignment_vec))#41
 
+        state.extend(self.grounding_rays)
 
+        state.append(self.max_grounding_distance)
         return state
 

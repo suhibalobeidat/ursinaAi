@@ -39,6 +39,7 @@ class Navigation_env():
         self.done = True
         self.restart = True
         self.error = False
+        self.origin = Transform()
 
     def init(self):
         self.system = System(shape=ConnectorShape.Rectangle,max_iteration=self.max_iteration,radius_mul=self.radius_mul)
@@ -105,6 +106,13 @@ class Navigation_env():
         #goal_point = self.layout.get_goal_point(distance)
         #goal_point = self.generate_random_point(distance)
 
+        rand = random.random()
+        self.system.system_segmants[0].position = self.system.system_segmants[0].position - self.origin.y_base * (self.layout.rooms[0].y_dim/2 - self.system.height/2 - self.system.max_grounding_distance*rand)
+        self.system.system_segmants[0].start_position = self.system.system_segmants[0].start_position - self.origin.y_base * (self.layout.rooms[0].y_dim/2 - self.system.height/2 - self.system.max_grounding_distance*rand)
+        self.system.system_segmants[0].end_position = self.system.system_segmants[0].end_position - self.origin.y_base * (self.layout.rooms[0].y_dim/2 - self.system.height/2 - self.system.max_grounding_distance*rand)
+        self.system.system_segmants[0].movment_transform.origin = self.system.system_segmants[0].movment_transform.origin - self.origin.y_base * (self.layout.rooms[0].y_dim/2 - self.system.height/2 - self.system.max_grounding_distance*rand)
+        self.system.system_connectors.pop()
+        self.system.system_connectors.append(self.system.system_segmants[0].movment_transform)
         
 
         #self.system.set_goal(goal_point)
