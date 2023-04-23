@@ -25,19 +25,18 @@ ACTION_LENGTH = 29
 MIN_SIZE = 15
 MAX_SIZE = 300
 MODEL_OUTPUT_DIR = r"C:\Users\sohai\Desktop\data_stat\test"#"/opt/ml/model"
-INPUT_DATA_DIR = "C:/Users/sohai/ray_results"#"/opt/ml/input/data
-INPUT_CHECKPOINT_NAME = "Trainable_2023-04-04_18-55-31/Trainable_20ee7_00000_0_2023-04-04_18-55-32/checkpoint_000764"
+INPUT_DATA_DIR = "C:/Users/sohai/Desktop/ursinaAi/"#"/opt/ml/input/data
+INPUT_CHECKPOINT_NAME = "pre_trained"
+DATA_STAT_NAME = "data_stat.h5"
 RESUME = True
 
 
 class Trainable(tune.Trainable):
     def setup(self, config):
 
-
         self.stat_manager = statManager.options(name="statManager").remote((TEXT_INPUT_LENGTH,))
 
-        self.dir = MODEL_OUTPUT_DIR
-        self.stat_manager.save_stat.remote(self.dir,"data_stat.h5")
+        self.stat_manager.save_stat.remote(MODEL_OUTPUT_DIR,DATA_STAT_NAME)
 
         lr = float(config["lr"])
         lambda_ = float(config["lambda_"])
@@ -122,11 +121,10 @@ class Trainable(tune.Trainable):
         return self.algo.train()
 
     def save_checkpoint(self, checkpoint_dir: str) -> Optional[Union[str, Dict]]:
-        self.stat_manager.save_stat.remote(self.dir,"data_stat.h5")
+        self.stat_manager.save_stat.remote(MODEL_OUTPUT_DIR,DATA_STAT_NAME)
         return self.algo.save_checkpoint(checkpoint_dir)
     
     def load_checkpoint(self, checkpoint: Union[Dict, str]):
-        self.stat_manager.load_stat.remote()
         return self.algo.load_checkpoint(checkpoint)
     
 

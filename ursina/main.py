@@ -43,7 +43,7 @@ class Ursina(ShowBase):
 
         # fallback to one of these if opengl is not supported
         loadPrcFileData("", "load-display pandaegl")
-        #loadPrcFileData('', 'aux-display p3tinydisplay')
+        #loadPrcFileData('', 'load-display p3tinydisplay')
 
         #loadPrcFileData('', 'aux-display pandaegl')
         #loadPrcFileData('', 'aux-display pandagles2')
