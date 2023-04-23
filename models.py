@@ -35,7 +35,12 @@ from ray.rllib.policy.rnn_sequencing import add_time_dimension
 from gym.wrappers.normalize import RunningMeanStd
 import h5py
 from ray.rllib.models.torch.misc import SlimFC,normc_initializer
-from ray.rllib.policy.torch_policy_template import build_torch_policy
+
+from ray.rllib.algorithms.registry import ALGORITHMS as ALL_ALGORITHMS
+
+from ray.tune.resources import Resources
+from ray.tune.execution.placement_groups import PlacementGroupFactory
+from ray import tune
 
 class ActorCritic(nn.Module):
     def __init__(self,text_input_length,depth_map_length,action_direction_length,recurrent = False):
@@ -410,6 +415,91 @@ def compute_gae_for_sample_batch(
 
     return batch """
 
+
+
 class MyPPO(PPO):
     def get_default_policy_class(self, config: AlgorithmConfigDict) -> Type[Policy]:
         return MyPPOTorchPolicy
+
+
+    @classmethod
+    @override(tune.Trainable)
+    def default_resource_request(
+        cls, config: Union[AlgorithmConfig, PartialAlgorithmConfigDict]
+    ) -> Union[Resources, PlacementGroupFactory]:
+
+        # Default logic for RLlib Algorithms:
+        # Create one bundle per individual worker (local or remote).
+        # Use `num_cpus_for_driver` and `num_gpus` for the local worker and
+        # `num_cpus_per_worker` and `num_gpus_per_worker` for the remote
+        # workers to determine their CPU/GPU resource needs.
+        
+        # Convenience config handles.
+        cf = cls.get_default_config().update_from_dict(config)
+        cf.validate()
+        cf.freeze()
+
+        # get evaluation config
+        eval_cf = cf.get_evaluation_config_object()
+        eval_cf.validate()
+        eval_cf.freeze()
+
+        # resources for local worker
+        local_worker = {
+            "CPU": cf.num_cpus_for_local_worker,
+            "GPU": 0 if cf._fake_gpus else cf.num_gpus,
+        }
+
+        bundles = [local_worker]
+
+        # resources for rollout env samplers
+        rollout_workers = [
+            {
+                "CPU": cf.num_cpus_per_worker,
+                "GPU": cf.num_gpus_per_worker,
+                **cf.custom_resources_per_worker,
+            }
+            for _ in range(cf.num_rollout_workers)
+        ]
+
+        # resources for evaluation env samplers or datasets (if any)
+        if cls._should_create_evaluation_rollout_workers(eval_cf):
+            # Evaluation workers.
+            # Note: The local eval worker is located on the driver CPU.
+            evaluation_bundle = [
+                {
+                    "CPU": eval_cf.num_cpus_per_worker,
+                    "GPU": eval_cf.num_gpus_per_worker,
+                    **eval_cf.custom_resources_per_worker,
+                }
+                for _ in range(eval_cf.evaluation_num_workers)
+            ]
+        else:
+            # resources for offline dataset readers during evaluation
+            # Note (Kourosh): we should not claim extra workers for
+            # training on the offline dataset, since rollout workers have already
+            # claimed it.
+            # Another Note (Kourosh): dataset reader will not use placement groups so
+            # whatever we specify here won't matter because dataset won't even use it.
+            # Disclaimer: using ray dataset in tune may cause deadlock when multiple
+            # tune trials get scheduled on the same node and do not leave any spare
+            # resources for dataset operations. The workaround is to limit the
+            # max_concurrent trials so that some spare cpus are left for dataset
+            # operations. This behavior should get fixed by the dataset team. more info
+            # found here:
+            # https://docs.ray.io/en/master/data/dataset-internals.html#datasets-tune
+            evaluation_bundle = []
+
+        statManager_bundle = [{
+            "CPU": 1,
+            "GPU": 0,
+        }]
+
+        bundles += rollout_workers + evaluation_bundle + statManager_bundle
+
+        # Return PlacementGroupFactory containing all needed resources
+        # (already properly defined as device bundles).
+        return PlacementGroupFactory(
+            bundles=bundles,
+            strategy=config.get("placement_strategy", "PACK"),
+        )
