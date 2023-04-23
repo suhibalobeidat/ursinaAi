@@ -39,9 +39,11 @@ class Ursina(ShowBase):
         #loadPrcFileData('', 'threading-model Cull')
         loadPrcFileData('', 'coordinate-system y-up-left')
         loadPrcFileData('', 'window-type none')
+        loadPrcFileData('', 'require-window 0')
 
         # fallback to one of these if opengl is not supported
         loadPrcFileData("", "load-display pandaegl")
+        #loadPrcFileData('', 'aux-display p3tinydisplay')
 
         #loadPrcFileData('', 'aux-display pandaegl')
         #loadPrcFileData('', 'aux-display pandagles2')
@@ -49,7 +51,7 @@ class Ursina(ShowBase):
         loadPrcFileData("", "aux-display pandagl")
         loadPrcFileData('', 'aux-display pandadx9')
         loadPrcFileData('', 'aux-display pandadx8')
-        #loadPrcFileData('', 'aux-display tinydisplay')
+        #loadPrcFileData('', 'aux-display p3tinydisplay')
         #loadPrcFileData('', 'gl-finish 1')   
 
         loadPrcFileData('', 'notify-level-util warning')   

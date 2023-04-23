@@ -12,7 +12,7 @@ class Navigator:
     def __init__(self, input_size,action_length,model_path,obs_mean,obs_var):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy = load_model("model",model_path).to(self.device)
+        self.policy = load_model("model",model_path,self.device).to(self.device)
 
         self.obs_mean = np.array(obs_mean)
         self.obs_var = np.array(obs_var)
@@ -82,8 +82,8 @@ class Navigator:
         self.connection.sendall(data.encode("UTF-8")) #Converting string to Byte, and sending it to C#
 
 
-def load_model(filename, directory):
-    _model = torch.load('%s/%s.pt' % (directory, filename))
+def load_model(filename, directory,device):
+    _model = torch.load('%s/%s.pt' % (directory, filename),map_location=device)
     return _model
     
 
